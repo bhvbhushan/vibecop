@@ -1,13 +1,13 @@
-# Project A: AI Code Quality Toolkit — Design & Implementation Plan
+# aiqt — AI Code Quality Toolkit: Design & Implementation Plan
 
-**Date:** 2026-03-31
-**Status:** Research Complete / Ready for Implementation Planning
+**Date:** 2026-04-01
+**Status:** Engineering Review Complete / Ready for Implementation
 
 ---
 
 ## Overview
 
-The open-source linter purpose-built for the AI coding era. Detects AI-specific code antipatterns that traditional tools miss: hallucinated APIs, over-abstraction, buzzword-laden code, tests that test nothing. Runs in CI in under 60 seconds, requires no API keys, fully deterministic.
+The open-source linter purpose-built for the AI coding era. Detects AI-specific code antipatterns that traditional tools miss: hallucinated imports, over-mocking, trivial assertions, insecure defaults, excessive comments. Runs in CI in under 60 seconds, requires no API keys, fully deterministic, zero network calls.
 
 ## Problem Statement
 
@@ -21,7 +21,7 @@ The open-source linter purpose-built for the AI coding era. Detects AI-specific 
 
 - **Gap 1 (AI Slop Defense):** PR quality gate for OSS maintainers
 - **Gap 2 (AI Code Debt Scanner):** Codebase scanner for AI-generated tech debt
-- **Gap 6 (AI Test Quality Evaluator):** Meaningful coverage scoring for AI-generated tests
+- **Gap 6 (AI Test Quality Evaluator):** Meaningful coverage scoring for AI-generated tests (Phase 3)
 
 ---
 
@@ -34,7 +34,7 @@ The open-source linter purpose-built for the AI coding era. Detects AI-specific 
 | SonarQube CE | Yes | No (paid only) | Partial | Yes | No | Yes |
 | Qodo/PR-Agent | LLM-based | No | Yes | No | Partial | Yes |
 | Semgrep | Yes | No catalog | No | Yes | No | Yes |
-| **Our Tool** | **Yes** | **Yes (core)** | **Yes** | **Yes** | **Yes** | **Yes** |
+| **aiqt** | **Yes** | **Yes (core)** | **Yes** | **Yes** | **Yes** | **Yes** |
 
 ### Key Competitor Details
 
@@ -57,160 +57,289 @@ The open-source linter purpose-built for the AI coding era. Detects AI-specific 
 
 ---
 
+## Engineering Review Decisions
+
+The following 10 decisions were finalized during engineering and CEO review and supersede all earlier design notes:
+
+1. **Parser: @ast-grep/napi** — 13K stars, 9 platform binaries, 10-50x faster than raw tree-sitter, ships pre-built native binaries via napi-rs. tree-sitter is NOT used directly.
+2. **Single package** — No monorepo, no `@aiqt/cli` / `@aiqt/core` split. Single `aiqt` npm package.
+3. **Bun for build/test/run** — `bun test` (not Vitest), `bun build` (not tsup). Node.js 20+ for end-user runtime compatibility.
+4. **Text-default output** — Text is the default `--format`. SARIF is optional, not primary.
+5. **7 detectors for v0.1** — Scope is fixed: undeclared-import, empty-error-handler, trivial-assertion, excessive-comment-ratio, over-defensive-coding, insecure-defaults, over-mocking.
+6. **Lock-file validation (no network)** — Parse `package.json`, lock files, and `requirements.txt` to answer "Is this import declared?" Zero network calls, zero overhead.
+7. **Deferred detectors** — hallucinated-api-call, copy-paste-duplication, tautological-test, over-abstraction, buzzword-comments are explicitly out of v0.1 scope.
+8. **No YAML rule format in v0.1** — All 7 detectors are implemented in TypeScript. No YAML DSL in this version.
+9. **Config: `.aiqt.yml`** — Loaded at startup, validated with Zod, minimal schema.
+10. **Languages v0.1: JS, TS, TSX, Python** — JS/TS/TSX built-in to @ast-grep/napi; Python via `@ast-grep/lang-python` + `registerDynamicLanguage()`.
+
+---
+
 ## Architecture
 
+### File Layout
+
 ```
-                    +-------------------+
-                    |   CLI Interface   |
-                    |  (scan / check)   |
-                    +--------+----------+
-                             |
-                    +--------v----------+
-                    |   Core Engine     |
-                    |  - File Discovery |
-                    |  - Parser Manager |
-                    |  - Rule Runner    |
-                    |  - Report Builder |
-                    +--------+----------+
-                             |
-              +--------------+---------------+
-              |              |               |
-     +--------v----+  +-----v------+  +-----v------+
-     | tree-sitter  |  |   Rule     |  |  Package   |
-     | Parser Pool  |  | Registry   |  | Validator  |
-     | (per-lang)   |  | (plugins)  |  | (npm/pypi) |
-     +--------------+  +-----+------+  +------------+
-                             |
-              +--------------+---------------+
-              |              |               |
-     +--------v----+  +-----v------+  +-----v------+
-     | AI Pattern  |  |   Test     |  |  Security  |
-     | Detectors   |  | Quality    |  | Detectors  |
-     |             |  | Analyzers  |  |            |
-     +-------------+  +------------+  +------------+
-                             |
-                    +--------v----------+
-                    |  Output Adapters  |
-                    | SARIF | JSON | CLI|
-                    | PR Comment | XML |
-                    +-------------------+
+aiqt/                           ← single npm package
+├── src/
+│   ├── cli.ts                  ← Commander.js entry (scan, check commands)
+│   ├── engine.ts               ← File discovery, detector runner, report builder
+│   ├── config.ts               ← .aiqt.yml loading + Zod validation
+│   ├── project.ts              ← Parse package.json, lock files, manifests → ProjectInfo
+│   ├── formatters/
+│   │   ├── text.ts             ← Default: stylish terminal output
+│   │   ├── json.ts             ← Programmatic JSON
+│   │   ├── sarif.ts            ← Optional SARIF 2.1.0 (~80 LOC hand-rolled)
+│   │   ├── github.ts           ← ::error annotations + GITHUB_STEP_SUMMARY
+│   │   └── html.ts             ← Single-file HTML report
+│   ├── detectors/
+│   │   ├── undeclared-import.ts
+│   │   ├── empty-error-handler.ts
+│   │   ├── trivial-assertion.ts
+│   │   ├── excessive-comment-ratio.ts
+│   │   ├── over-defensive-coding.ts
+│   │   ├── insecure-defaults.ts
+│   │   └── over-mocking.ts
+│   └── types.ts                ← Detector, DetectionContext, Finding, ProjectInfo, etc.
+├── test/
+├── package.json
+├── tsconfig.json
+├── .aiqt.yml                   ← Self-dogfood config
+└── docs/
+    └── design.md               ← This file
 ```
 
 ### Tech Stack
 
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
-| Runtime | Node.js 20+ | Best tree-sitter bindings, npm ecosystem |
+| Runtime | Node.js 20+ / bun | bun for dev, Node for broad end-user compat |
 | Language | TypeScript | Type safety for AST operations |
-| Parser | tree-sitter | 40+ languages, 36x faster, used by GitHub/Neovim/Zed |
-| Rule format | YAML (simple) + TS plugins (complex) | Similar to ast-grep |
-| CLI | Commander.js | Standard |
-| Output | SARIF (primary) | Native GitHub Security tab integration |
-| Testing | Vitest | Fast, modern |
-| Build | tsup (esbuild) | Fast builds |
+| Parser | @ast-grep/napi | 13K stars, 9 platform binaries, 10-50x faster than raw tree-sitter |
+| Lang: Python | @ast-grep/lang-python | One import + `registerDynamicLanguage()` |
+| CLI | Commander.js | Standard, widely understood |
+| Config validation | Zod | Schema validation with good error messages |
+| Output: SARIF | @types/sarif (types only) | Hand-roll ~80 LOC serializer, no runtime dep |
+| Test | bun test | Built-in, no extra dependency |
+| Build | bun build | Built-in |
 | Distribution | npm (`npx aiqt scan`) | Largest reach |
-| Monorepo | pnpm workspaces | `@aiqt/cli`, `@aiqt/core`, `@aiqt/rules-default`, `@aiqt/github-action` |
 
-### Plugin/Rule System
+---
+
+## Core Interfaces
 
 ```typescript
 interface Detector {
   id: string;
   meta: DetectorMeta;
-  detect(context: DetectionContext): Finding[];
+  detect(ctx: DetectionContext): Finding[];
+}
+
+interface DetectorMeta {
+  name: string;
+  description: string;
+  severity: 'error' | 'warning' | 'info';
+  category: 'correctness' | 'quality' | 'security' | 'testing';
+  languages: Lang[];
 }
 
 interface DetectionContext {
   file: FileInfo;
-  cst: Tree;              // tree-sitter CST
-  query: QueryAPI;         // tree-sitter query helpers
-  project: ProjectInfo;    // package.json, imports map
-  config: RuleConfig;
+  root: SgRoot;              // ast-grep root node
+  source: string;            // raw file text
+  project: ProjectInfo;      // dependencies, lock file data
+  config: RuleConfig;        // per-rule config overrides
+}
+
+interface Finding {
+  detectorId: string;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+  file: string;
+  line: number;
+  column: number;
+  endLine?: number;
+  endColumn?: number;
+  suggestion?: string;
+}
+
+interface ProjectInfo {
+  dependencies: Set<string>;
+  devDependencies: Set<string>;
+  manifests: string[];
 }
 ```
 
-### Dual Mode
+---
 
-- **PR Gate:** git diff input, <60s target, PR comment + check status, merge blocking
-- **Codebase Scan:** entire directory, minutes acceptable, CLI report + SARIF, trend tracking
+## Data Flow
 
-### Language Support
-
-- **Tier 1 (Phase 1):** JavaScript, TypeScript, Python
-- **Tier 2 (Phase 2-3):** Go, Java, Rust
-- **Tier 3 (Community):** C#, Ruby, PHP, Swift, Kotlin via plugin API
+```
+CLI args
+  → loadConfig(.aiqt.yml or defaults)
+  → loadProjectInfo(package.json, lock files, requirements.txt, pyproject.toml)
+  → discoverFiles(path, config.ignore, .gitignore)
+  → for each file:
+      → parse with ast-grep (language auto-detected from extension)
+      → run each enabled detector(ctx) → Finding[]
+      → isolate: if detector throws, log error, continue
+  → aggregate all findings
+  → apply --max-findings N cap (default 50)
+  → format(findings, --format flag)
+  → exit(findings.length > 0 ? 1 : 0)
+```
 
 ---
 
-## AI-Specific Antipattern Catalog
+## CLI Commands (v0.1)
 
-Based on CodeRabbit (470 PRs), Ox Security, and academic literature:
+```
+aiqt scan [path]
+  # Scan directory (default: cwd)
+  --format text|json|github|sarif|html   (default: text)
+  --config <path>
+  --no-config
+  --max-findings N                        (default: 50)
+  --verbose                               (timing summary)
+  --diff <ref>                            (scan only changed files vs git ref)
+  --stdin-files                           (read file list from stdin)
 
-**Logic & Correctness:** Hallucinated API calls, hallucinated package imports, business logic errors, unsafe control flow
-
-**Code Structure:** Over-abstraction, unnecessary defensive coding, code duplication (8x more in AI code per GitClear), logic sprawl, inconsistent error handling
-
-**Security:** Hardcoded credentials, SQL injection, missing auth, disabled TLS, insecure defaults (2.74x more XSS per CodeRabbit)
-
-**Performance:** Excessive I/O (8x more frequent), unnecessary network calls in loops, missing caching
-
-**AI Telltales:** High comment-to-code ratio, buzzword comments, emoji-heavy docs, overly verbose variable names
-
-**Test-Specific:** Tautological tests, trivial assertions, over-mocking, missing edge cases, redundant test cases
+aiqt check <file>
+  # Single file scan
+  --format text|json|github|sarif|html
+  --max-findings N
+  --verbose
+```
 
 ---
 
-## Implementation Plan
+## v0.1 Detectors (7)
 
-### Phase 1: Core Scanner CLI (Weeks 1-4)
+| # | Detector | Category | Severity | Key Pattern |
+|---|----------|----------|----------|-------------|
+| 1 | undeclared-import | correctness | error | Import not in package.json/lock file/requirements.txt |
+| 2 | empty-error-handler | quality | warning | `catch(e) { console.log(e) }`, bare `except: pass` |
+| 3 | trivial-assertion | testing | warning | `expect(true).toBe(true)`, `assert True` |
+| 4 | excessive-comment-ratio | quality | info | comment LOC / code LOC > threshold (default 0.5) |
+| 5 | over-defensive-coding | quality | info | Redundant null checks, unnecessary try/catch |
+| 6 | insecure-defaults | security | error | Hardcoded secrets, `rejectUnauthorized: false`, `eval()` |
+| 7 | over-mocking | testing | warning | mock/spy count > assertion count in test files |
 
-**P0 Detectors (Weeks 1-2):**
-1. `hallucinated-import` — Cross-reference imports against npm/PyPI registry
-2. `empty-error-handler` — catch blocks with only console.log/pass
-3. `trivial-assertion` — expect(true).toBe(true), assert True
-4. `excessive-comment-ratio` — comment LOC / code LOC > threshold
-5. `over-defensive-coding` — redundant null checks, unnecessary try/catch
+### Detector Implementation Notes
 
-**P1 Detectors (Weeks 2-3):**
-6. `hallucinated-api-call` — method calls against known API surfaces
-7. `copy-paste-duplication` — AST subtree fingerprinting + similarity
-8. `over-abstraction` — patterns with single implementation
-9. `buzzword-comments` — "robust", "scalable", "elegant" keyword matching
-10. `insecure-defaults` — hardcoded credentials, disabled TLS
+**undeclared-import:** Parses `package.json` deps, lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`), and `requirements.txt` / `pyproject.toml`. Answers "Is this import declared?" with zero network calls. Registry cross-reference is explicitly out of scope.
 
-**P2 Detectors (Weeks 3-4):**
-11. `tautological-test` — assertions mirroring implementation
-12. `over-mocking` — mock count > assertion count
-13. `logic-sprawl` — cyclomatic complexity + length + params
-14. `inconsistent-error-handling` — mixed patterns per module
-15. `unnecessary-abstraction-layer` — wrappers that just delegate
+**insecure-defaults:** Pattern-match only — no network lookups, no external validation.
 
-**CLI Interface:**
+**excessive-comment-ratio:** Configurable threshold via `.aiqt.yml`. Default 0.5 (50% comment lines triggers warning).
+
+All detectors are implemented in TypeScript. No YAML rule format in v0.1.
+
+---
+
+## Configuration (.aiqt.yml)
+
+Minimal schema, validated with Zod at startup. Example:
+
+```yaml
+ignore:
+  - "node_modules/**"
+  - "dist/**"
+  - "**/*.d.ts"
+
+rules:
+  excessive-comment-ratio:
+    threshold: 0.5
+  undeclared-import:
+    severity: error
+  insecure-defaults:
+    severity: error
 ```
-aiqt scan [path]          # Full codebase scan
-aiqt check <file>         # Single file
-aiqt init                 # Generate .aiqt.yml
-aiqt rules                # List available rules
-aiqt explain <rule-id>    # Explain a rule with examples
-```
 
-**Configuration:** `.aiqt.yml` with rule overrides, severity thresholds, file patterns, scoring weights.
+Config is optional — aiqt runs with safe defaults if no `.aiqt.yml` is present (`--no-config` skips loading entirely).
 
-### Phase 2: PR Gate GitHub Action (Weeks 5-7)
+---
 
-- Wraps core scanner + anti-slop metadata checks
-- Diff-only analysis for speed
+## Output Formats
+
+| Format | Flag | Use Case |
+|--------|------|----------|
+| text | `--format text` | **Default.** Stylish terminal output, human-readable |
+| json | `--format json` | Programmatic consumption, CI pipelines |
+| github | `--format github` | `::error` annotations + `GITHUB_STEP_SUMMARY` |
+| sarif | `--format sarif` | Optional SARIF 2.1.0, GitHub Security tab upload |
+| html | `--format html` | Single-file HTML report |
+
+SARIF is optional, not the primary format. Hand-rolled ~80 LOC serializer, `@types/sarif` for types only.
+
+VS Code problem matcher pattern will be included in `package.json` for terminal integration.
+
+---
+
+## Error Handling
+
+The engine handles the following error conditions explicitly:
+
+- **EACCES** — Permission denied on file/directory: log warning, skip, continue
+- **ELOOP** — Symlink loop: log warning, skip, continue
+- **Detector throw** — Isolated per-detector: log error with detector id + file, continue with remaining detectors
+- **Detector timeout** — Per-detector timeout enforced; exceeded detectors are skipped with a warning
+- **EPIPE** — Piped output closed early (e.g. `aiqt scan | head`): exit cleanly, no stack trace
+- **Git errors** — `--diff` ref not found or not a git repo: clear error message, exit 1
+
+---
+
+## Language Support (v0.1)
+
+| Language | Support | How |
+|----------|---------|-----|
+| JavaScript | Built-in | @ast-grep/napi |
+| TypeScript | Built-in | @ast-grep/napi |
+| TSX | Built-in | @ast-grep/napi |
+| Python | Included | `@ast-grep/lang-python` + `registerDynamicLanguage()` |
+
+Language is auto-detected from file extension. Tier 2 languages (Go, Java, Rust) and community languages are deferred to later phases.
+
+---
+
+## What is NOT in v0.1
+
+The following are explicitly deferred:
+
+- **Monorepo package structure** (`@aiqt/cli`, `@aiqt/core`, etc.)
+- **YAML rule format** — detectors are TypeScript-only
+- **PR Gate GitHub Action** — Phase 2
+- **Test Quality Evaluator** — Phase 3
+- **Deferred detectors:** hallucinated-api-call, copy-paste-duplication, tautological-test, over-abstraction, buzzword-comments
+- **Auto-fix / code rewriting**
+- **`aiqt init`, `aiqt rules`, `aiqt explain` commands**
+- **Scoring weights / quality score**
+- **Online registry verification** (npm/PyPI cross-reference)
+- **poetry.lock, uv.lock, Pipfile.lock** parsing
+- **Tier 2+ language support** (Go, Java, Rust, etc.)
+
+---
+
+## Phased Roadmap
+
+### Phase 1: Core Scanner CLI — v0.1 (current)
+
+7 detectors, single package, JS/TS/TSX/Python, text-default output, `.aiqt.yml` config, `aiqt scan` + `aiqt check` commands. `--diff`, `--stdin-files`, `--max-findings`, `--verbose`, `--format html` included per CEO review.
+
+### Phase 2: PR Gate GitHub Action
+
+- Wraps core scanner
+- Diff-only analysis for speed target <60s
 - Inline PR comments + summary comment
 - Actions on failure: comment-only (default), request-changes, label, auto-close (opt-in)
-- Configuration extends `.aiqt.yml` with `pr-gate` section
+- Configuration extends `.aiqt.yml` with `pr-gate:` section
 
-### Phase 3: Test Quality Evaluator (Weeks 8-10)
+### Phase 3: Test Quality Evaluator
 
-**8 test-specific detectors:** trivial-assertion, tautological-test, over-mocking, missing-error-path-test, redundant-test, no-boundary-test, snapshot-only-test, implementation-coupled-test
+8 test-specific detectors including tautological-test, over-mocking (already in v0.1), missing-error-path-test, redundant-test, no-boundary-test, snapshot-only-test, implementation-coupled-test.
 
-**Mutation testing integration:** Optional StrykerJS/Cosmic Ray wrapper
+Optional StrykerJS/Cosmic Ray mutation testing integration.
 
-**Meaningful Coverage Score (0-100):**
+Meaningful Coverage Score (0-100):
 ```
 Score = weighted_average(
   assertion_quality   * 0.30,
@@ -238,16 +367,6 @@ Score = weighted_average(
 
 ---
 
-## Open Questions
-
-1. Naming: `aiqt`, `sloplint`, `ai-lint`, `codewatch`? Check npm availability.
-2. ast-grep as dependency vs custom engine?
-3. Hallucinated API depth: package-level vs method-level validation?
-4. Optional LLM mode for deeper detection alongside deterministic rules?
-5. Scoring calibration against real codebases needed.
-
----
-
 ## Sources
 
 - [Anti-Slop GitHub](https://github.com/peakoss/anti-slop)
@@ -255,8 +374,8 @@ Score = weighted_average(
 - [SpecDetect4AI (arxiv 2509.20491)](https://arxiv.org/abs/2509.20491)
 - [Slopsquatting (USENIX Security 2025)](https://www.aikido.dev/blog/slopsquatting-ai-package-hallucination-attacks)
 - [CodeRabbit AI vs Human Code](https://www.coderabbit.ai/blog/state-of-ai-vs-human-code-generation-report)
-- [tree-sitter](https://github.com/tree-sitter/tree-sitter)
 - [ast-grep](https://ast-grep.github.io/)
+- [@ast-grep/napi](https://www.npmjs.com/package/@ast-grep/napi)
 - [GitHub SARIF Integration](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github)
 - [StrykerJS](https://stryker-mutator.io/)
 - [SonarQube AI Code Detection](https://docs.sonarsource.com/sonarqube-server/2025.2/ai-capabilities/autodetect-ai-code)
