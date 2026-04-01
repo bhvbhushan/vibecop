@@ -239,9 +239,10 @@ export function runDetectors(
           (perDetector[detector.id] ?? 0) + elapsed;
       }
 
-      // Check max findings cap
+      // Check max findings cap (0 = unlimited)
       if (
         options.maxFindings !== undefined &&
+        options.maxFindings > 0 &&
         findings.length >= options.maxFindings
       ) {
         const totalMs = performance.now() - startTime;

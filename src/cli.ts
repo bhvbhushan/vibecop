@@ -143,12 +143,14 @@ interface ScanOptions {
   verbose: boolean;
   diff?: string;
   stdinFiles?: boolean;
+  groupBy: string;
 }
 
 interface CheckOptions {
   format: string;
   maxFindings: string;
   verbose: boolean;
+  groupBy: string;
 }
 
 /** Execute the scan command */
@@ -191,9 +193,10 @@ async function scanAction(
   });
 
   // Format and output
+  const groupBy = options.groupBy === "rule" ? "rule" : "file";
   let formatter: (r: typeof result) => string;
   try {
-    formatter = getFormatter(options.format);
+    formatter = getFormatter(options.format, { groupBy });
   } catch (err: unknown) {
     process.stderr.write(
       `${err instanceof Error ? err.message : String(err)}\n`,
@@ -244,9 +247,10 @@ function checkAction(
     maxFindings: Number.isNaN(maxFindings) ? 50 : maxFindings,
   });
 
+  const groupBy = options.groupBy === "rule" ? "rule" : "file";
   let formatter: (r: typeof result) => string;
   try {
-    formatter = getFormatter(options.format);
+    formatter = getFormatter(options.format, { groupBy });
   } catch (err: unknown) {
     process.stderr.write(
       `${err instanceof Error ? err.message : String(err)}\n`,
@@ -288,6 +292,7 @@ function main(): void {
     .option("--verbose", "Show timing information", false)
     .option("--diff <ref>", "Scan only files changed vs git ref")
     .option("--stdin-files", "Read file list from stdin", false)
+    .option("--group-by <mode>", "Group findings by 'file' or 'rule'", "file")
     .action(scanAction);
 
   program
@@ -305,6 +310,7 @@ function main(): void {
       "50",
     )
     .option("--verbose", "Show timing information", false)
+    .option("--group-by <mode>", "Group findings by 'file' or 'rule'", "file")
     .action(checkAction);
 
   program.parse();

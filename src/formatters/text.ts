@@ -43,18 +43,18 @@ function severityColor(
   }
 }
 
-/**
- * Format scan results as stylish terminal output.
- *
- * Groups findings by file, shows line:column, severity, message, and detector ID.
- * Adds color when stdout is a TTY (unless NO_COLOR is set).
- * Shows a summary line at the bottom with total counts.
- */
-export function formatText(result: ScanResult): string {
-  const c = shouldUseColor() ? COLORS : NO_COLORS;
-  const lines: string[] = [];
+export interface TextFormatOptions {
+  groupBy?: "file" | "rule";
+}
 
-  // Group findings by file
+type ColorSet = typeof COLORS | typeof NO_COLORS;
+
+/** Render findings grouped by file (default) */
+function renderByFile(
+  result: ScanResult,
+  c: ColorSet,
+  lines: string[],
+): void {
   const byFile = new Map<string, Finding[]>();
   for (const finding of result.findings) {
     const existing = byFile.get(finding.file);
@@ -65,7 +65,6 @@ export function formatText(result: ScanResult): string {
     }
   }
 
-  // Compute column widths for alignment
   let maxLocLen = 0;
   let maxSevLen = 0;
   for (const findings of byFile.values()) {
@@ -76,22 +75,80 @@ export function formatText(result: ScanResult): string {
     }
   }
 
-  // Render findings grouped by file
   for (const [file, findings] of byFile) {
     lines.push(`${c.bold}${file}${c.reset}`);
-
     for (const f of findings) {
       const loc = `${f.line}:${f.column}`;
       const sevColor = severityColor(f.severity, c);
       const paddedLoc = loc.padEnd(maxLocLen);
       const paddedSev = f.severity.padEnd(maxSevLen);
-
       lines.push(
         `  ${c.dim}${paddedLoc}${c.reset}  ${sevColor}${paddedSev}${c.reset}  ${f.message}  ${c.dim}${f.detectorId}${c.reset}`,
       );
     }
-
     lines.push("");
+  }
+}
+
+/** Render findings grouped by rule/detector */
+function renderByRule(
+  result: ScanResult,
+  c: ColorSet,
+  lines: string[],
+): void {
+  const byRule = new Map<string, Finding[]>();
+  for (const finding of result.findings) {
+    const existing = byRule.get(finding.detectorId);
+    if (existing) {
+      existing.push(finding);
+    } else {
+      byRule.set(finding.detectorId, [finding]);
+    }
+  }
+
+  for (const [rule, findings] of byRule) {
+    const sevColor = severityColor(findings[0].severity, c);
+    const count = findings.length;
+    lines.push(
+      `${c.bold}${rule}${c.reset} ${c.dim}(${count} ${findings[0].severity}${count !== 1 ? "s" : ""})${c.reset}`,
+    );
+
+    let maxFileLocLen = 0;
+    for (const f of findings) {
+      const fileLoc = `${f.file}:${f.line}:${f.column}`;
+      if (fileLoc.length > maxFileLocLen) maxFileLocLen = fileLoc.length;
+    }
+
+    for (const f of findings) {
+      const fileLoc = `${f.file}:${f.line}:${f.column}`;
+      const padded = fileLoc.padEnd(maxFileLocLen);
+      lines.push(
+        `  ${sevColor}${padded}${c.reset}  ${f.message}`,
+      );
+    }
+    lines.push("");
+  }
+}
+
+/**
+ * Format scan results as stylish terminal output.
+ *
+ * Groups findings by file (default) or by rule (--group-by rule).
+ * Adds color when stdout is a TTY (unless NO_COLOR is set).
+ * Shows a summary line at the bottom with total counts.
+ */
+export function formatText(
+  result: ScanResult,
+  options?: TextFormatOptions,
+): string {
+  const c = shouldUseColor() ? COLORS : NO_COLORS;
+  const lines: string[] = [];
+  const groupBy = options?.groupBy ?? "file";
+
+  if (groupBy === "rule") {
+    renderByRule(result, c, lines);
+  } else {
+    renderByFile(result, c, lines);
   }
 
   // Show scan errors
