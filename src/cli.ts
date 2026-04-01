@@ -1,26 +1,15 @@
 #!/usr/bin/env node
 
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { resolve, relative, extname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { extname, relative, resolve } from "node:path";
 import { Command } from "commander";
 import { loadConfig, DEFAULT_CONFIG } from "./config.js";
 import { builtinDetectors } from "./detectors/index.js";
-import { discoverFiles, runDetectors } from "./engine.js";
+import { EXTENSION_MAP, discoverFiles, pathsToFileInfos, runDetectors } from "./engine.js";
 import { getFormatter } from "./formatters/index.js";
 import { loadProjectInfo } from "./project.js";
-import type { AiqtConfig, FileInfo, Lang } from "./types.js";
-
-/** Map file extensions to Lang (mirrors engine.ts) */
-const EXTENSION_MAP: Record<string, Lang> = {
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".ts": "typescript",
-  ".tsx": "tsx",
-  ".py": "python",
-};
+import type { AiqtConfig, FileInfo } from "./types.js";
 
 /** Read version from package.json */
 function getVersion(): string {
@@ -84,40 +73,6 @@ function getGitDiffFiles(ref: string, scanRoot: string): string[] {
       err instanceof Error ? err.message : String(err);
     throw new Error(`Failed to get git diff against '${ref}': ${message}`);
   }
-}
-
-/** Convert file paths to FileInfo objects, filtering to supported extensions */
-function pathsToFileInfos(
-  paths: string[],
-  scanRoot: string,
-): FileInfo[] {
-  const resolvedRoot = resolve(scanRoot);
-  const files: FileInfo[] = [];
-
-  for (const filePath of paths) {
-    const absolutePath = resolve(resolvedRoot, filePath);
-    if (!existsSync(absolutePath)) continue;
-
-    try {
-      const stat = statSync(absolutePath);
-      if (!stat.isFile()) continue;
-    } catch {
-      continue;
-    }
-
-    const ext = extname(absolutePath);
-    const language = EXTENSION_MAP[ext];
-    if (!language) continue;
-
-    files.push({
-      path: relative(resolvedRoot, absolutePath),
-      absolutePath,
-      language,
-      extension: ext,
-    });
-  }
-
-  return files;
 }
 
 /** Write output to stdout, handling EPIPE */

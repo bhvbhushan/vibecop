@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "bun build src/cli.ts --outdir dist --target node",
+    "build:action": "npx ncc build src/action/main.ts -o dist/action --source-map --license licenses.txt",
     "test": "bun test",
     "lint": "bunx biome check",
     "typecheck": "bunx tsc --noEmit"
@@ -33,8 +34,10 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ast-grep/napi": "^0.42.0",
+    "@actions/core": "^3.0.0",
+    "@actions/github": "^9.0.0",
     "@ast-grep/lang-python": "^0.0.6",
+    "@ast-grep/napi": "^0.42.0",
     "commander": "^13.1.0",
     "yaml": "^2.7.1",
     "zod": "^3.24.4"
@@ -42,6 +45,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/sarif": "^2.1.7",
+    "@vercel/ncc": "^0.38.4",
     "bun-types": "^1.3.11",
     "typescript": "^5.8.3"
   },
