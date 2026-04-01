@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
-import type { AiqtConfig, RuleConfig } from "./types.js";
+import type { AiqtConfig, PrGateConfig, RuleConfig } from "./types.js";
 
 const RuleConfigSchema = z
   .object({
@@ -10,16 +10,28 @@ const RuleConfigSchema = z
   })
   .catchall(z.unknown());
 
+const PrGateConfigSchema = z.object({
+  "on-failure": z
+    .enum(["comment-only", "request-changes", "label", "auto-close"])
+    .default("comment-only"),
+  label: z.string().default("aiqt:needs-review"),
+  "severity-threshold": z
+    .enum(["error", "warning", "info"])
+    .default("warning"),
+  "max-findings": z.number().int().min(0).default(50),
+});
+
 const AiqtConfigSchema = z.object({
   rules: z.record(z.string(), RuleConfigSchema).default({}),
   ignore: z
     .array(z.string())
-    .default(["node_modules/**", "dist/**", "**/*.min.js", "**/*.d.ts"]),
+    .default(["**/node_modules/**", "**/dist/**", "**/build/**", "**/.next/**", "**/docs/**", "**/vendor/**", "**/*.min.js", "**/*.d.ts"]),
+  "pr-gate": PrGateConfigSchema.optional(),
 });
 
 export const DEFAULT_CONFIG: AiqtConfig = {
   rules: {},
-  ignore: ["node_modules/**", "dist/**", "**/*.min.js", "**/*.d.ts"],
+  ignore: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.next/**", "**/docs/**", "**/vendor/**", "**/*.min.js", "**/*.d.ts"],
 };
 
 /**
@@ -86,10 +98,14 @@ export function loadConfig(configPath?: string): AiqtConfig {
 function mergeWithDefaults(
   userConfig: z.infer<typeof AiqtConfigSchema>,
 ): AiqtConfig {
-  return {
+  const config: AiqtConfig = {
     rules: userConfig.rules as Record<string, RuleConfig>,
     ignore: userConfig.ignore,
   };
+  if (userConfig["pr-gate"]) {
+    config["pr-gate"] = userConfig["pr-gate"] as PrGateConfig;
+  }
+  return config;
 }
 
 function isNodeError(err: unknown): err is NodeJS.ErrnoException {

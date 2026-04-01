@@ -10,12 +10,28 @@ import type { Detector, DetectionContext, Finding } from "../types.js";
  * - Python: verify=False in requests, shell=True in subprocess
  */
 
+/** Test file detection pattern */
+const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
+
 /** Credential-related variable name patterns */
 const CREDENTIAL_NAME_PATTERN =
   /^(?:.*_)?(?:password|passwd|secret|api_key|apikey|api_secret|token|auth_token|access_token|private_key)(?:_.*)?$/i;
 
 /** Weak cipher algorithms */
 const WEAK_CIPHERS = new Set(["des", "des-ede", "des-ede3", "rc4", "rc2", "md5"]);
+
+/** Values that look like URL paths, error messages, or enum names — not credentials */
+function looksLikeNonCredential(value: string): boolean {
+  // URL paths: "/auth/refresh-token", "/api/token"
+  if (value.startsWith("/")) return true;
+  // Human-readable sentences (error messages)
+  if (/\s{2,}/.test(value) || /[.!?]$/.test(value) || value.split(" ").length > 3) return true;
+  // Enum/constant values: "TOKEN_EXPIRED", "REFRESH_TOKEN"
+  if (/^[A-Z][A-Z_]+$/.test(value)) return true;
+  // Environment variable references
+  if (value.startsWith("process.env.") || value.startsWith("${")) return true;
+  return false;
+}
 
 function detectJavaScriptInsecureDefaults(ctx: DetectionContext): Finding[] {
   const findings: Finding[] = [];
@@ -30,8 +46,10 @@ function detectJavaScriptInsecureDefaults(ctx: DetectionContext): Finding[] {
   // 3. new Function() usage
   detectNewFunction(root, ctx, findings);
 
-  // 4. Hardcoded credentials
-  detectHardcodedCredentialsJS(root, ctx, findings);
+  // 4. Hardcoded credentials (skip in test files)
+  if (!TEST_FILE_RE.test(ctx.file.path)) {
+    detectHardcodedCredentialsJS(root, ctx, findings);
+  }
 
   // 5. Weak ciphers
   detectWeakCiphers(root, ctx, findings);
@@ -152,9 +170,10 @@ function detectHardcodedCredentialsJS(
     const keyName = key.text().replace(/["']/g, "");
     if (!CREDENTIAL_NAME_PATTERN.test(keyName)) continue;
 
-    // Check that the string is non-empty
+    // Check that the string is non-empty and looks like a real credential
     const strContent = value.text().slice(1, -1);
     if (strContent.length === 0) continue;
+    if (looksLikeNonCredential(strContent)) continue;
 
     const range = pair.range();
     findings.push({
@@ -185,9 +204,10 @@ function checkCredentialAssignment(
   const varName = nameNode.text();
   if (!CREDENTIAL_NAME_PATTERN.test(varName)) return;
 
-  // Check that the string is non-empty
+  // Check that the string is non-empty and looks like a real credential
   const strContent = valueNode.text().slice(1, -1);
   if (strContent.length === 0) return;
+  if (looksLikeNonCredential(strContent)) return;
 
   const range = node.range();
   findings.push({
@@ -260,8 +280,10 @@ function detectPythonInsecureDefaults(ctx: DetectionContext): Finding[] {
   // 3. eval() usage
   detectPythonEval(root, ctx, findings);
 
-  // 4. Hardcoded credentials
-  detectPythonHardcodedCredentials(root, ctx, findings);
+  // 4. Hardcoded credentials (skip in test files)
+  if (!TEST_FILE_RE.test(ctx.file.path)) {
+    detectPythonHardcodedCredentials(root, ctx, findings);
+  }
 
   return findings;
 }

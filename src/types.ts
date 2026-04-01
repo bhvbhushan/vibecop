@@ -56,10 +56,19 @@ export interface ProjectInfo {
   manifests: string[];
 }
 
+/** PR gate configuration for GitHub Action */
+export interface PrGateConfig {
+  "on-failure": "comment-only" | "request-changes" | "label" | "auto-close";
+  label: string;
+  "severity-threshold": "error" | "warning" | "info";
+  "max-findings": number;
+}
+
 /** Top-level aiqt configuration */
 export interface AiqtConfig {
   rules: Record<string, RuleConfig>;
   ignore: string[];
+  "pr-gate"?: PrGateConfig;
 }
 
 /** Per-rule configuration */

@@ -1,6 +1,6 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join, relative, resolve } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 import { parse, Lang as SgLang, registerDynamicLanguage } from "@ast-grep/napi";
 import type {
   AiqtConfig,
@@ -15,7 +15,7 @@ import type {
 } from "./types.js";
 
 /** Map file extensions to Lang */
-const EXTENSION_MAP: Record<string, Lang> = {
+export const EXTENSION_MAP: Record<string, Lang> = {
   ".js": "javascript",
   ".jsx": "javascript",
   ".mjs": "javascript",
@@ -60,36 +60,76 @@ const DETECTOR_TIMEOUT_MS = 5_000;
 /**
  * Compile a glob pattern into a RegExp that can be tested efficiently.
  * Escapes regex-special characters and converts glob wildcards to regex syntax.
+ *
+ * Globstar matches zero or more path segments (including separators).
+ * Single star matches any characters within a single path segment (no slash).
  */
 function compileGlob(pattern: string): RegExp {
-  // Mark ** and * before escaping other characters
-  // Use unique placeholders that won't contain special regex characters
-  let result = pattern
-    .replace(/\*\*/g, "\x00GLOBSTAR\x00")  // Temporarily mark **
-    .replace(/\*/g, "\x00STAR\x00")         // Temporarily mark *
+  // Tokenize pattern into literal segments and wildcards
+  const tokens: Array<{ type: "literal" | "globstar" | "star"; value: string }> = [];
+  let i = 0;
+  while (i < pattern.length) {
+    if (pattern[i] === "*" && pattern[i + 1] === "*") {
+      tokens.push({ type: "globstar", value: "**" });
+      i += 2;
+    } else if (pattern[i] === "*") {
+      tokens.push({ type: "star", value: "*" });
+      i += 1;
+    } else {
+      // Accumulate literal characters
+      let lit = "";
+      while (i < pattern.length && pattern[i] !== "*") {
+        lit += pattern[i];
+        i += 1;
+      }
+      tokens.push({ type: "literal", value: lit });
+    }
+  }
 
-  // Now escape all regex-special characters
-  result = result
-    .replace(/\\/g, "\\\\") // Backslash
-    .replace(/\./g, "\\.")   // Dot
-    .replace(/\?/g, "\\?")   // Question mark
-    .replace(/\+/g, "\\+")   // Plus
-    .replace(/\(/g, "\\(")   // Left paren
-    .replace(/\)/g, "\\)")   // Right paren
-    .replace(/\[/g, "\\[")   // Left bracket
-    .replace(/\]/g, "\\]")   // Right bracket
-    .replace(/\{/g, "\\{")   // Left brace
-    .replace(/\}/g, "\\}")   // Right brace
-    .replace(/\^/g, "\\^")   // Caret
-    .replace(/\$/g, "\\$")   // Dollar
-    .replace(/\|/g, "\\|");  // Pipe
+  // Build regex parts from tokens
+  const regexParts: string[] = [];
+  for (let t = 0; t < tokens.length; t++) {
+    const token = tokens[t];
+    if (token.type === "literal") {
+      // Escape regex-special characters
+      regexParts.push(
+        token.value.replace(/[\\^$.|?+()[\]{}]/g, "\\$&"),
+      );
+    } else if (token.type === "star") {
+      regexParts.push("[^/]*");
+    } else {
+      // globstar: absorb surrounding slashes to allow matching zero segments
+      // Check if previous part ends with / and next part starts with /
+      const prev = regexParts.length > 0 ? regexParts[regexParts.length - 1] : null;
+      const next = t + 1 < tokens.length ? tokens[t + 1] : null;
 
-  // Now replace marked wildcards with their regex equivalents
-  const regexStr = result
-    .replace(/\x00GLOBSTAR\x00/g, ".*")        // ** matches anything including /
-    .replace(/\x00STAR\x00/g, "[^/]*");        // * matches anything except /
+      const prevHasSlash = prev !== null && prev.endsWith("\\/");
+      const nextHasSlash = next !== null && next.type === "literal" && next.value.startsWith("/");
 
-  return new RegExp(`^${regexStr}$`);
+      if (prev === null && nextHasSlash) {
+        // Leading: **/rest → match "" or "anything/" prefix
+        // Remove leading / from next token
+        tokens[t + 1] = { ...next!, value: next!.value.slice(1) };
+        regexParts.push("(.+\\/)?");
+      } else if (prevHasSlash && (next === null || (next.type === "literal" && next.value === ""))) {
+        // Trailing: prefix/** → match "" or "/anything" suffix
+        // Remove trailing / from prev
+        regexParts[regexParts.length - 1] = prev!.slice(0, -2);
+        regexParts.push("(\\/.*)?");
+      } else if (prevHasSlash && nextHasSlash) {
+        // Middle: prefix/**/rest → match "/" or "/anything/"
+        // Remove trailing / from prev and leading / from next
+        regexParts[regexParts.length - 1] = prev!.slice(0, -2);
+        tokens[t + 1] = { ...next!, value: next!.value.slice(1) };
+        regexParts.push("(\\/.*)?\\/" );
+      } else {
+        // Standalone ** without slashes — match anything
+        regexParts.push(".*");
+      }
+    }
+  }
+
+  return new RegExp(`^${regexParts.join("")}$`);
 }
 
 /**
@@ -406,10 +446,14 @@ function loadGitignore(root: string): string[] {
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith("#"))
       .map((line) => {
-        // Normalize: remove trailing slashes for directory patterns
-        // and add ** for glob matching
+        // Strip leading slash — gitignore uses it to mean "root-relative"
+        // but our glob matcher works on relative paths from scan root
+        if (line.startsWith("/")) {
+          line = line.slice(1);
+        }
+        // Directory patterns: ensure they match recursively
         if (line.endsWith("/")) {
-          return `${line}**`;
+          return `**/${line}**`;
         }
         return line;
       });
@@ -442,6 +486,49 @@ function isBinaryFile(filePath: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Convert file paths to FileInfo objects, filtering to supported extensions.
+ * Shared between CLI and GitHub Action.
+ */
+export function pathsToFileInfos(
+  paths: string[],
+  scanRoot: string,
+): FileInfo[] {
+  const resolvedRoot = resolve(scanRoot);
+  const files: FileInfo[] = [];
+
+  for (const filePath of paths) {
+    const absolutePath = resolve(resolvedRoot, filePath);
+    if (!existsSync(absolutePath)) continue;
+
+    try {
+      const stat = statSync(absolutePath);
+      if (!stat.isFile()) continue;
+    } catch {
+      continue;
+    }
+
+    const ext = extname(absolutePath);
+    const language = EXTENSION_MAP[ext];
+    if (!language) continue;
+
+    files.push({
+      path: relative(resolvedRoot, absolutePath),
+      absolutePath,
+      language,
+      extension: ext,
+    });
+  }
+
+  return files;
+}
+
+const TEST_FILE_PATTERN = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
+
+export function isTestFile(filePath: string): boolean {
+  return TEST_FILE_PATTERN.test(filePath);
 }
 
 function isNodeError(err: unknown): err is NodeJS.ErrnoException {
