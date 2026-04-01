@@ -42,14 +42,14 @@ aiqt scan . --config .aiqt.yml
 
 ## Real-World Results
 
-Tested against 4 production codebases (2,019 files total). These are real results, not synthetic:
+Validated against 4 production codebases across different domains (2,019 files, ~300K LOC). These are real results, not synthetic:
 
-| Project | Files | Findings | Key Issues Found |
-|---------|:-----:|:--------:|------------------|
-| **vizionforge** | 484 | 1,622 | 2,557-line god function, 10 double type assertions, auth tokens in localStorage |
-| **reddit-marketer** | 772 | 1,389 | 628 console.logs in prod, 485 god functions, unsanitized dangerouslySetInnerHTML |
-| **fxy** | 516 | 3,069 | 539 god functions, 4 dead code paths, 43 unchecked DB results |
-| **sdrPrompter** | 247 | 364 | N+1 queries in edge functions, 5 unchecked DB mutations |
+| Codebase Type | Files | Findings | Key Issues Found |
+|---------------|:-----:|:--------:|------------------|
+| **Full-stack SaaS** (Next.js + Prisma) | 484 | 1,622 | 2,557-line god function, auth tokens in localStorage, 10 double type assertions |
+| **API-heavy backend** (Next.js + Supabase) | 772 | 1,389 | 628 console.logs in prod, unsanitized `dangerouslySetInnerHTML`, 485 god functions |
+| **Microservices** (TypeScript + MongoDB) | 516 | 3,069 | 539 god functions, 4 dead code paths, 43 unchecked DB results |
+| **Edge functions** (Supabase + Deno) | 247 | 364 | N+1 queries in edge functions, 5 fire-and-forget DB mutations |
 
 Verified true positive rate: **~80%** across spot-checked findings.
 
@@ -233,6 +233,12 @@ aiqt follows [Semantic Versioning](https://semver.org/):
 - [x] **Phase 2**: PR Gate GitHub Action, 15 new detectors (7 → 22), monorepo support, real-world validation
 - [ ] **Phase 3**: Cross-file analysis (duplicate code detection, repeated constants), npm publish
 - [ ] **Phase 4**: LLM-powered deep review mode (separation of concerns, semantic duplication)
+
+## Related Projects
+
+- [code-review-graph](https://github.com/tirth8205/code-review-graph) — Builds a persistent structural map of your codebase using Tree-sitter parsing for blast-radius analysis and optimized AI code reviews. Complementary to aiqt: code-review-graph maps _structure_, aiqt finds _antipatterns_.
+- [ast-grep](https://github.com/ast-grep/ast-grep) — The tree-sitter-based AST tool that powers aiqt's pattern matching engine.
+- [mcptest](https://github.com/bhvbhushan/mcptest) — Quality gate for MCP servers. Compliance, security, and efficiency testing. Sister project to aiqt.
 
 ## License
 
