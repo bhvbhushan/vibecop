@@ -4,10 +4,15 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green)](https://nodejs.org/)
 [![CI](https://github.com/bhvbhushan/vibecop/actions/workflows/ci.yml/badge.svg)](https://github.com/bhvbhushan/vibecop/actions/workflows/ci.yml)
+[![Playground](https://img.shields.io/badge/Try-Playground-orange)](https://vibecop-pg.bhvbhushan7.com/)
 
 AI code quality toolkit — deterministic linter for the AI coding era. Catches the bugs that AI agents introduce: god functions, N+1 queries, fire-and-forget DB calls, leftover debug logging, and 18 more patterns. Like `eslint` for structural quality, but focused on the antipatterns AI generates.
 
 Built on [ast-grep](https://ast-grep.github.io/) for fast, tree-sitter-based AST analysis. No LLM required — every finding is deterministic and reproducible.
+
+## Try it Online
+
+**[Playground](https://vibecop-pg.bhvbhushan7.com/)** — paste code and scan instantly in your browser.
 
 ## Install
 
