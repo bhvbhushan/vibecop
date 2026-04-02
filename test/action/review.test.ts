@@ -53,7 +53,7 @@ describe("formatInlineComment", () => {
 
     const output = formatInlineComment(finding);
 
-    expect(output).toContain("**ai-lint**");
+    expect(output).toContain("**vibecop**");
     expect(output).toContain("`empty-catch`");
     expect(output).toContain(":x:");
     expect(output).toContain("Empty catch block found");
@@ -156,7 +156,7 @@ describe("applyLabel", () => {
   test("adds label to pull request", async () => {
     const { calls, octokit } = createMockOctokit();
 
-    await applyLabel(octokit, "test-owner", "test-repo", 99, "ai-lint:failing");
+    await applyLabel(octokit, "test-owner", "test-repo", 99, "vibecop:failing");
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe("issues.addLabels");
@@ -165,7 +165,7 @@ describe("applyLabel", () => {
     expect(params.owner).toBe("test-owner");
     expect(params.repo).toBe("test-repo");
     expect(params.issue_number).toBe(99);
-    expect(params.labels).toEqual(["ai-lint:failing"]);
+    expect(params.labels).toEqual(["vibecop:failing"]);
   });
 });
 

@@ -123,9 +123,9 @@ export function formatSarif(result: ScanResult): string {
       {
         tool: {
           driver: {
-            name: "ai-lint",
+            name: "vibecop",
             version: "0.1.0",
-            informationUri: "https://github.com/bhvbhushan/ai-lint",
+            informationUri: "https://github.com/bhvbhushan/vibecop",
             rules,
           },
         },

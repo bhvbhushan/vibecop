@@ -39,7 +39,7 @@ jobs:
         run: |
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "current=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-          PUBLISHED_VERSION=$(npm view ai-lint version 2>/dev/null || echo "0.0.0")
+          PUBLISHED_VERSION=$(npm view vibecop version 2>/dev/null || echo "0.0.0")
           if [ "$CURRENT_VERSION" = "$PUBLISHED_VERSION" ]; then
             echo "Version $CURRENT_VERSION is already published. Skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"

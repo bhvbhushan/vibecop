@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
-import type { AiLintConfig, PrGateConfig, RuleConfig } from "./types.js";
+import type { VibeCopConfig, PrGateConfig, RuleConfig } from "./types.js";
 
 const RuleConfigSchema = z
   .object({
@@ -14,14 +14,14 @@ const PrGateConfigSchema = z.object({
   "on-failure": z
     .enum(["comment-only", "request-changes", "label", "auto-close"])
     .default("comment-only"),
-  label: z.string().default("ai-lint:needs-review"),
+  label: z.string().default("vibecop:needs-review"),
   "severity-threshold": z
     .enum(["error", "warning", "info"])
     .default("warning"),
   "max-findings": z.number().int().min(0).default(50),
 });
 
-const AiLintConfigSchema = z.object({
+const VibeCopConfigSchema = z.object({
   rules: z.record(z.string(), RuleConfigSchema).default({}),
   ignore: z
     .array(z.string())
@@ -29,22 +29,22 @@ const AiLintConfigSchema = z.object({
   "pr-gate": PrGateConfigSchema.optional(),
 });
 
-export const DEFAULT_CONFIG: AiLintConfig = {
+export const DEFAULT_CONFIG: VibeCopConfig = {
   rules: {},
   ignore: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.next/**", "**/docs/**", "**/vendor/**", "**/*.min.js", "**/*.d.ts"],
 };
 
 /**
- * Load and validate an ai-lint config file.
+ * Load and validate an vibecop config file.
  *
  * If `configPath` is provided, reads that file directly.
- * Otherwise searches for `.ai-lint.yml` in the current working directory.
+ * Otherwise searches for `.vibecop.yml` in the current working directory.
  *
  * Returns defaults when no config file is found.
  * Throws on invalid YAML or validation errors.
  */
-export function loadConfig(configPath?: string): AiLintConfig {
-  const filePath = configPath ?? resolve(process.cwd(), ".ai-lint.yml");
+export function loadConfig(configPath?: string): VibeCopConfig {
+  const filePath = configPath ?? resolve(process.cwd(), ".vibecop.yml");
 
   let raw: string;
   try {
@@ -77,7 +77,7 @@ export function loadConfig(configPath?: string): AiLintConfig {
     return { ...DEFAULT_CONFIG };
   }
 
-  const result = AiLintConfigSchema.safeParse(parsed);
+  const result = VibeCopConfigSchema.safeParse(parsed);
   if (!result.success) {
     const issues = result.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
@@ -96,9 +96,9 @@ export function loadConfig(configPath?: string): AiLintConfig {
  * User-specified rules are merged on top of the empty default.
  */
 function mergeWithDefaults(
-  userConfig: z.infer<typeof AiLintConfigSchema>,
-): AiLintConfig {
-  const config: AiLintConfig = {
+  userConfig: z.infer<typeof VibeCopConfigSchema>,
+): VibeCopConfig {
+  const config: VibeCopConfig = {
     rules: userConfig.rules as Record<string, RuleConfig>,
     ignore: userConfig.ignore,
   };

@@ -1,12 +1,12 @@
-# Contributing to ai-lint
+# Contributing to vibecop
 
 Thanks for your interest in contributing. This guide covers everything you need to get started.
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/bhvbhushan/ai-lint.git
-cd ai-lint
+git clone https://github.com/bhvbhushan/vibecop.git
+cd vibecop
 bun install
 bun run build
 bun test

@@ -117,7 +117,7 @@ export function formatInlineComment(
 ): string {
   const lines: string[] = [];
 
-  lines.push(`**ai-lint** | \`${finding.detectorId}\` | ${severityEmoji(finding.severity)}`);
+  lines.push(`**vibecop** | \`${finding.detectorId}\` | ${severityEmoji(finding.severity)}`);
   lines.push("");
   lines.push(finding.message);
 

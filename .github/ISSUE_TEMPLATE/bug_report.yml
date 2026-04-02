@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug in ai-lint
+description: Report a bug in vibecop
 labels: ["bug"]
 body:
   - type: textarea
@@ -16,7 +16,7 @@ body:
       label: Steps to Reproduce
       description: Steps to reproduce the behavior.
       placeholder: |
-        1. Run `ai-lint ...`
+        1. Run `vibecop ...`
         2. See error
     validations:
       required: true
@@ -66,9 +66,9 @@ body:
       required: true
 
   - type: input
-    id: ai-lint-version
+    id: vibecop-version
     attributes:
-      label: ai-lint Version
+      label: vibecop Version
       placeholder: e.g., "0.1.0"
     validations:
       required: true

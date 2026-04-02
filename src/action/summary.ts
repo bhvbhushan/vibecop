@@ -33,7 +33,7 @@ export function buildActionSummary(
 
   const lines: string[] = [];
 
-  lines.push("## ai-lint PR Scan Results");
+  lines.push("## vibecop PR Scan Results");
   lines.push("");
 
   if (total === 0) {
@@ -94,7 +94,7 @@ export function buildActionSummary(
 
   lines.push("---");
   lines.push(
-    '<sub>Scanned by <a href="https://github.com/bhvbhushan/ai-lint">ai-lint</a></sub>',
+    '<sub>Scanned by <a href="https://github.com/bhvbhushan/vibecop">vibecop</a></sub>',
   );
 
   return lines.join("\n");

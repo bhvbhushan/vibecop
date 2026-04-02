@@ -176,7 +176,7 @@ describe("formatGithub", () => {
   });
 
   test("writes GITHUB_STEP_SUMMARY markdown", () => {
-    const summaryFile = join(tmpdir(), `ai-lint-test-summary-${Date.now()}.md`);
+    const summaryFile = join(tmpdir(), `vibecop-test-summary-${Date.now()}.md`);
     writeFileSync(summaryFile, "");
     process.env.GITHUB_STEP_SUMMARY = summaryFile;
 
@@ -207,7 +207,7 @@ describe("formatGithub", () => {
       const content = readFileSync(summaryFile, "utf-8");
 
       // Check header
-      expect(content).toContain("## ai-lint Scan Results");
+      expect(content).toContain("## vibecop Scan Results");
 
       // Check severity summary table
       expect(content).toContain("| Error | 1 |");

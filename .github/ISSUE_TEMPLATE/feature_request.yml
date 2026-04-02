@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest a new feature or improvement for ai-lint
+description: Suggest a new feature or improvement for vibecop
 labels: ["enhancement"]
 body:
   - type: textarea

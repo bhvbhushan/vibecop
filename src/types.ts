@@ -64,8 +64,8 @@ export interface PrGateConfig {
   "max-findings": number;
 }
 
-/** Top-level ai-lint configuration */
-export interface AiLintConfig {
+/** Top-level vibecop configuration */
+export interface VibeCopConfig {
   rules: Record<string, RuleConfig>;
   ignore: string[];
   "pr-gate"?: PrGateConfig;

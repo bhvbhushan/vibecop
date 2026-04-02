@@ -29,7 +29,7 @@ async function runCli(
 }
 
 describe("CLI E2E", () => {
-  test("ai-lint scan on dirty fixtures produces output with findings", async () => {
+  test("vibecop scan on dirty fixtures produces output with findings", async () => {
     const { stdout, exitCode } = await runCli([
       "scan",
       DIRTY_FIXTURES,
@@ -44,7 +44,7 @@ describe("CLI E2E", () => {
     expect(exitCode).toBe(1);
   });
 
-  test("ai-lint scan with --format json produces valid JSON", async () => {
+  test("vibecop scan with --format json produces valid JSON", async () => {
     const { stdout, exitCode } = await runCli([
       "scan",
       DIRTY_FIXTURES,
@@ -72,7 +72,7 @@ describe("CLI E2E", () => {
     expect(exitCode).toBe(0);
   });
 
-  test("ai-lint check on a single dirty file produces findings", async () => {
+  test("vibecop check on a single dirty file produces findings", async () => {
     const dirtyFile = join(DIRTY_FIXTURES, "bad-code.ts");
     const { stdout, exitCode } = await runCli(["check", dirtyFile]);
 
@@ -81,7 +81,7 @@ describe("CLI E2E", () => {
     expect(exitCode).toBe(1);
   });
 
-  test("ai-lint check on a single clean file produces no findings", async () => {
+  test("vibecop check on a single clean file produces no findings", async () => {
     const cleanFile = join(CLEAN_FIXTURES, "good-code.ts");
     const { stdout, exitCode } = await runCli(["check", cleanFile]);
 
@@ -89,7 +89,7 @@ describe("CLI E2E", () => {
     expect(exitCode).toBe(0);
   });
 
-  test("ai-lint scan with --verbose shows timing info", async () => {
+  test("vibecop scan with --verbose shows timing info", async () => {
     const { stdout } = await runCli([
       "scan",
       DIRTY_FIXTURES,
@@ -101,7 +101,7 @@ describe("CLI E2E", () => {
     expect(stdout).toContain("ms");
   });
 
-  test("ai-lint --version outputs version", async () => {
+  test("vibecop --version outputs version", async () => {
     const { stdout } = await runCli(["--version"]);
     // Should output something like "0.1.0"
     expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
@@ -130,7 +130,7 @@ describe("CLI E2E", () => {
     ]);
 
     expect(stdout).toContain("<!DOCTYPE html>");
-    expect(stdout).toContain("ai-lint Report");
+    expect(stdout).toContain("vibecop Report");
     // Dirty fixtures should produce findings
     expect(exitCode).toBe(1);
   });

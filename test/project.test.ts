@@ -96,7 +96,7 @@ describe("parsePyprojectToml", () => {
 
   test("returns empty ProjectInfo when no manifest found", () => {
     // Use a path that definitely has no manifests
-    const info = loadProjectInfo("/tmp/ai-lint-nonexistent-dir-12345");
+    const info = loadProjectInfo("/tmp/vibecop-nonexistent-dir-12345");
 
     expect(info.dependencies.size).toBe(0);
     expect(info.devDependencies.size).toBe(0);

@@ -41,7 +41,7 @@ function buildSummaryMarkdown(result: ScanResult): string {
 
   const lines: string[] = [];
 
-  lines.push("## ai-lint Scan Results");
+  lines.push("## vibecop Scan Results");
   lines.push("");
   lines.push("| Severity | Count |");
   lines.push("|----------|-------|");

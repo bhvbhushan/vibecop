@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { extname, join, relative, resolve } from "node:path";
 import { parse, Lang as SgLang, registerDynamicLanguage } from "@ast-grep/napi";
 import type {
-  AiLintConfig,
+  VibeCopConfig,
   DetectionContext,
   Detector,
   FileInfo,
@@ -137,7 +137,7 @@ function compileGlob(pattern: string): RegExp {
  */
 export function discoverFiles(
   scanRoot: string,
-  config: AiLintConfig,
+  config: VibeCopConfig,
 ): FileInfo[] {
   const root = resolve(scanRoot);
   const files: FileInfo[] = [];
@@ -161,7 +161,7 @@ export function runDetectors(
   files: FileInfo[],
   detectors: Detector[],
   project: ProjectInfo,
-  config: AiLintConfig,
+  config: VibeCopConfig,
   options: {
     verbose?: boolean;
     maxFindings?: number;

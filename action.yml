@@ -1,4 +1,4 @@
-name: 'ai-lint PR Gate'
+name: 'vibecop PR Gate'
 description: 'AI code quality linter — scans PR changes for AI-generated code antipatterns'
 author: 'bhvbhushan'
 
@@ -8,9 +8,9 @@ inputs:
     required: false
     default: '${{ github.token }}'
   config:
-    description: 'Path to .ai-lint.yml config file'
+    description: 'Path to .vibecop.yml config file'
     required: false
-    default: '.ai-lint.yml'
+    default: '.vibecop.yml'
   on-failure:
     description: 'Action on findings: comment-only, request-changes, label, auto-close'
     required: false
@@ -18,7 +18,7 @@ inputs:
   label:
     description: 'Label to apply when on-failure is "label"'
     required: false
-    default: 'ai-lint:needs-review'
+    default: 'vibecop:needs-review'
   max-findings:
     description: 'Maximum findings to report (0 = unlimited)'
     required: false

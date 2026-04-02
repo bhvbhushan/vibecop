@@ -81,12 +81,12 @@ describe("buildActionSummary", () => {
     expect(output).not.toContain("Scan Errors");
   });
 
-  test("includes ai-lint attribution footer", () => {
+  test("includes vibecop attribution footer", () => {
     const result = makeResult();
 
     const output = buildActionSummary(result, 0, [], 50);
 
-    expect(output).toContain('<sub>Scanned by <a href="https://github.com/bhvbhushan/ai-lint">ai-lint</a></sub>');
+    expect(output).toContain('<sub>Scanned by <a href="https://github.com/bhvbhushan/vibecop">vibecop</a></sub>');
   });
 
   test("shows severity emojis in summary-only table", () => {

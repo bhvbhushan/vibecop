@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { discoverFiles, runDetectors } from "../src/engine.js";
 import type {
-  AiLintConfig,
+  VibeCopConfig,
   Detector,
   DetectionContext,
   Finding,
@@ -11,7 +11,7 @@ import type {
 
 const FIXTURES_DIR = join(import.meta.dir, "fixtures", "engine");
 
-const EMPTY_CONFIG: AiLintConfig = { rules: {}, ignore: [] };
+const EMPTY_CONFIG: VibeCopConfig = { rules: {}, ignore: [] };
 
 const EMPTY_PROJECT: ProjectInfo = {
   dependencies: new Set(),
@@ -109,7 +109,7 @@ describe("discoverFiles", () => {
   });
 
   test("respects ignore patterns", () => {
-    const config: AiLintConfig = {
+    const config: VibeCopConfig = {
       rules: {},
       ignore: ["ignored/**"],
     };
@@ -262,7 +262,7 @@ describe("runDetectors", () => {
     });
     const tsFiles = files.filter((f) => f.language === "typescript");
 
-    const config: AiLintConfig = {
+    const config: VibeCopConfig = {
       rules: {
         "disabled-detector": { severity: "off" },
       },
