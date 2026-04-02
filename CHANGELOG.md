@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-04-02
+
+### Fixed
+
+- Fix native binding error when installed via npm — externalize `@ast-grep/napi` so platform-specific binaries resolve from `node_modules` at runtime
+- Move `@actions/core` and `@actions/github` to devDependencies — CLI users no longer install unused GitHub Action deps
+
 ## [0.1.0] - 2026-04-01 -- Initial Release
 
 ### Added
