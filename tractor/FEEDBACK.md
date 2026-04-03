@@ -317,22 +317,28 @@ that look like misspelled versions of known fields (`expect-valid` vs `expect`).
 
 ### Feature Requests
 
-#### 5. Line Counting / Source Length Functions
+#### 5. Line Counting — Works via `--meta`, But Hard to Discover and Verbose
 
-**Tracking: No existing issue or todo — [needs new issue](#new-issues-to-file)**
+**Tracking: [boukeversteegh/tractor#75](https://github.com/boukeversteegh/tractor/issues/75)**
 
-**Severity: High (blocks important rules)**
+**Severity: ~~High~~ → Low (works, but ergonomics could improve)**
 
 VibeCop's `god-function` detector checks function body line count (>50 lines = warning,
->100 = error). There's no XPath function to count lines in a node's source text.
+>100 = error). I initially believed this was impossible in Tractor, but it turns out
+`--meta` adds `start` and `end` attributes (as `"line:col"` strings) to every element,
+and XPath's `substring-before()` can extract the line part:
 
-Desired:
 ```xpath
-//function[line-count(body) > 50]
+//function[number(substring-before(@end, ':')) - number(substring-before(@start, ':')) > 50]
 ```
 
-Currently, `string-length()` exists in XPath 3.1 but I couldn't find a way to
-count newlines within matched source text. This is the #1 missing feature for linting.
+This works but is verbose and hard to discover. I didn't find out that `--meta`
+exposed line information until it was pointed out to me. A cleaner syntax would help:
+
+```xpath
+//function[lines(.) > 50]           -- ideal: built-in function
+//function[@end-line - @start-line > 50]  -- good: separate numeric attributes
+```
 
 #### 6. Cyclomatic Complexity Calculation
 
@@ -537,7 +543,7 @@ or similar to distinguish "tractor failed" from "tractor found problems".
 |----------|---------|-----------------|
 | P0 | Fix TSX/JSX parsing | `dangerous-inner-html`, `god-component` |
 | P0 | Document `check --rules` YAML format | All rules (usability) |
-| P1 | Line counting function | `god-function` (full), `excessive-comment-ratio` |
+| ~~P1~~ | ~~Line counting function~~ | Works via `--meta` + `substring-before()` — ergonomics issue [#75](https://github.com/boukeversteegh/tractor/issues/75) |
 | ~~P1~~ | ~~File exclude in `check --rules`~~ | Already works — undiscovered due to undocumented format (#12) |
 | P1 | Unify `run` / `check --rules` config | Usability |
 | P2 | Cyclomatic complexity helper or docs | `god-function` (full) |
@@ -561,10 +567,7 @@ of the project directory. Already tracked in [todo/20](https://github.com/boukev
 
 ### 3. ~~Unknown YAML keys silently ignored~~ → Filed as [boukeversteegh/tractor#68](https://github.com/boukeversteegh/tractor/issues/68)
 
-### 4. Feature: line-count / span-count XPath function for linting
-- **Labels**: enhancement, xpath
-- **Ref**: Feedback #5 above
-- **Summary**: No way to count source lines within a matched node. `//function[line-count(body) > 50]` would unlock "god function" detection and similar size-based rules. This is the #1 missing feature for using tractor as a linting backend.
+### 4. ~~Line counting function~~ → Workaround exists, ergonomics issue filed as [boukeversteegh/tractor#75](https://github.com/boukeversteegh/tractor/issues/75)
 
 ### 5. ~~Document `check --rules` YAML format~~ → Filed as [boukeversteegh/tractor#69](https://github.com/boukeversteegh/tractor/issues/69)
 

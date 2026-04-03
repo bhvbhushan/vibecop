@@ -7,12 +7,12 @@ showing the dramatic reduction in complexity.
 
 | Metric | VibeCop (ast-grep) | Tractor (XPath) |
 |--------|-------------------|-----------------|
-| Rule definitions | 3,863 lines TypeScript (22 files) | ~180 lines YAML ([rules.yaml](rules.yaml)) |
+| Rule definitions | 3,863 lines TypeScript (22 files) | ~185 lines YAML ([rules.yaml](rules.yaml)) |
 | Validation / tests | 3,804 lines TypeScript (22 files) | ~46 lines YAML (inline in [rules.yaml](rules.yaml)) |
-| Comments / boilerplate | (included above) | ~32 lines |
-| **Total** | **7,667 lines across 44 files** | **258 lines in [1 file](rules.yaml)** |
-| Rules ported | 22 | 15 |
-| Rules not yet portable | — | 7 |
+| Comments / boilerplate | (included above) | ~34 lines |
+| **Total** | **7,667 lines across 44 files** | **265 lines in [1 file](rules.yaml)** |
+| Rules ported | 22 | 17 (incl. god-function line count via `--meta`) |
+| Rules not yet portable | — | 5 (+ 3 beyond AST scope) |
 
 Tractor's `expect-valid` / `expect-invalid` fields embed validation examples
 directly in the rule definition. VibeCop requires separate `*.test.ts` files with
@@ -31,24 +31,26 @@ replaces both the detector code AND the test code.**
 | 2 | `double-type-assertion` | quality | 49 | 129 | **178** | 8 lines | FULL |
 | 3 | `empty-error-handler` | quality | 174 | 209 | **383** | 18 lines | FULL |
 | 4 | `todo-in-production` | quality | 53 | 200 | **253** | 10 lines | FULL |
-| 5 | `god-function` (params) | quality | 294 | 196 | **490** | 7 lines | PARTIAL |
+| 5 | `god-function` (params+lines) | quality | 294 | 196 | **490** | 21 lines | FULL* |
 | 6 | `sql-injection` | security | 195 | 132 | **327** | 18 lines | FULL |
 | 7 | `insecure-defaults` (eval+TLS) | security | 434 | 266 | **699** | 14 lines | PARTIAL |
 | 8 | `token-in-localstorage` | security | 66 | 131 | **197** | 15 lines | FULL |
 | 9 | `n-plus-one-query` | correctness | 291 | 175 | **466** | 15 lines | PARTIAL |
-| | **Ported total** | | **1,644** | **1,595** | **3,238** | **~118** | |
+| | **Ported total** | | **1,644** | **1,595** | **3,238** | **~132** | |
 
-**That's a 27x reduction** — from 3,238 lines of TypeScript (detectors + tests)
-to ~118 lines of declarative YAML (rules + inline validation examples).
+\* Requires `--meta` flag. Line count uses `substring-before(@end,':')` — verbose but functional.
 
-And the YAML is self-documenting: each rule's `expect-valid` and `expect-invalid`
-serve as both documentation and automated tests.
+**That's a 25x reduction** — from 3,238 lines of TypeScript (detectors + tests)
+to ~132 lines of declarative YAML (rules + inline validation examples).
+
+And the YAML is self-documenting: each rule's `expect`
+entries serve as both documentation and automated tests.
 
 ### Not Yet Ported
 
 | # | VibeCop Rule | Category | Det. | Tests | Total | Blocker |
 |---|-------------|----------|------|-------|-------|---------|
-| 10 | `god-function` (lines/complexity) | quality | (see #5) | — | — | No line-counting function |
+| 10 | ~~`god-function` (lines)~~ | quality | — | — | — | ~~Ported~~ — moved to row #5 via `--meta` |
 | 11 | `god-component` | quality | 128 | 196 | 324 | TSX/JSX parsing broken |
 | 12 | `unbounded-query` | quality | 146 | 91 | 237 | Negative check on chained calls |
 | 13 | `excessive-any` | quality | 89 | 163 | 252 | File-level counting (may work) |
@@ -68,7 +70,7 @@ serve as both documentation and automated tests.
 
 | Rule | Needed Feature | Estimated Tractor Size |
 |------|---------------|----------------------|
-| `god-function` (full) | `line-count()` function | ~5 lines |
+| ~~`god-function` (full)~~ | ~~Ported via `--meta`~~ | ~~done~~ |
 | `god-component` | Fix TSX/JSX parsing | ~8 lines |
 | `dangerous-inner-html` | Fix TSX/JSX parsing | ~5 lines |
 | `excessive-any` | Per-file counting (may already work) | ~5 lines |
@@ -95,18 +97,18 @@ VibeCop (ast-grep):
   Total:        7,667 lines across 44 files
 
 Tractor (XPath):
-  Rules + tests: 258 lines YAML (1 file)
+  Rules + tests: 265 lines YAML (1 file)
   ────────────────────────────────────
-  Coverage:      ~60% of VibeCop's rules
+  Coverage:      17 rules (~65% of VibeCop's detectors)
 ```
 
-### What blocks the remaining 40%
+### What blocks the remaining ~35%
 
 1. **TSX/JSX parsing** (2 rules) — Tractor bug, fix would unlock them
 2. **Cross-file/project context** (3 rules) — fundamentally beyond AST scope
-3. **Counting/comparison** (4 rules) — need richer XPath functions or helpers
+3. **Counting/comparison** (3 rules) — need richer XPath functions or helpers
 4. **Complex structural patterns** (3 rules) — possible but need XPath expertise
 
 Even conservatively, Tractor could handle **~75% of VibeCop's rules** as pure
-declarative config once TSX parsing and line counting are fixed, replacing
-~5,000 lines of TypeScript + tests with ~150 lines of YAML.
+declarative config once TSX parsing is fixed, replacing
+~5,000 lines of TypeScript + tests with ~170 lines of YAML.

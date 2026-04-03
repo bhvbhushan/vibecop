@@ -117,6 +117,27 @@ rules:
     expect:
       - valid: "const f = (a: string, b: number) => a + b"
 
+  # [FULL] god-function: functions exceeding 50 lines (warning) or 100 lines (error)
+  # Requires --meta flag to access start/end line attributes.
+  # Covers the line-count part of src/detectors/god-function.ts (294 lines)
+  # NOTE: tractor must be invoked with --meta for these rules to work:
+  #   tractor check "src/**/*.ts" --rules tractor/rules.yaml --meta -f gcc
+  - id: god-function-lines-warning
+    xpath: >-
+      //function[
+        number(substring-before(@end, ':')) - number(substring-before(@start, ':')) > 50
+      ]
+    reason: "Function exceeds 50 lines. Consider breaking it into smaller functions."
+    severity: warning
+
+  - id: god-function-lines-error
+    xpath: >-
+      //function[
+        number(substring-before(@end, ':')) - number(substring-before(@start, ':')) > 100
+      ]
+    reason: "Function exceeds 100 lines. This is a god function — break it up."
+    severity: error
+
   # ===========================================================================
   # SECURITY
   # ===========================================================================
