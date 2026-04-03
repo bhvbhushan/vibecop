@@ -7,18 +7,18 @@ showing the dramatic reduction in complexity.
 
 | Metric | VibeCop (ast-grep) | Tractor (XPath) |
 |--------|-------------------|-----------------|
-| Detector code | 3,863 lines TypeScript | — |
-| Test code | 3,804 lines TypeScript | — |
-| **Total (detectors + tests)** | **7,667 lines** | **258 lines YAML** |
-| Rules ported | — | 15 XPath rules |
-| Rules not yet portable | — | 7 rules |
-| Inline validation examples | No (separate test files) | Yes (expect-valid/invalid in rule definition) |
+| Rule definitions | 3,863 lines TypeScript (22 files) | ~180 lines YAML ([rules.yaml](rules.yaml)) |
+| Validation / tests | 3,804 lines TypeScript (22 files) | ~46 lines YAML (inline in [rules.yaml](rules.yaml)) |
+| Comments / boilerplate | (included above) | ~32 lines |
+| **Total** | **7,667 lines across 44 files** | **258 lines in [1 file](rules.yaml)** |
+| Rules ported | 22 | 15 |
+| Rules not yet portable | — | 7 |
 
 Tractor's `expect-valid` / `expect-invalid` fields embed validation examples
 directly in the rule definition. VibeCop requires separate `*.test.ts` files with
 a full Bun test harness, AST parsing setup, and assertion boilerplate for every rule.
 
-**The Tractor rules file (258 lines including comments and validation examples)
+**The Tractor rules file (258 lines including inline validation examples)
 replaces both the detector code AND the test code.**
 
 ## Rule-by-Rule Comparison
