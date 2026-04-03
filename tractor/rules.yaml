@@ -32,15 +32,14 @@ rules:
     reason: "Debug console statement left in production code. Remove or replace with a structured logger."
     severity: warning
     language: typescript
-    expect-valid:
-      - 'console.error("legit error")'
-      - 'console.warn("legit warning")'
-      - 'logger.info("structured")'
-    expect-invalid:
-      - 'console.log("debug")'
-      - 'console.debug("trace")'
-      - 'console.info("verbose")'
-      - 'console.table(data)'
+    expect:
+      - valid: 'console.error("legit error")'
+      - valid: 'console.warn("legit warning")'
+      - valid: 'logger.info("structured")'
+      - invalid: 'console.log("debug")'
+      - invalid: 'console.debug("trace")'
+      - invalid: 'console.info("verbose")'
+      - invalid: 'console.table(data)'
 
   # [FULL] double-type-assertion: as unknown as X / as any as X
   # Replaces: src/detectors/double-type-assertion.ts (49 lines, regex-based!)
@@ -49,11 +48,10 @@ rules:
     reason: "Double type assertion (as unknown as X) bypasses TypeScript type safety. Fix the underlying type mismatch."
     severity: warning
     language: typescript
-    expect-valid:
-      - "const x = value as string"
-    expect-invalid:
-      - "const x = value as unknown as string"
-      - "const x = value as any as number"
+    expect:
+      - valid: "const x = value as string"
+      - invalid: "const x = value as unknown as string"
+      - invalid: "const x = value as any as number"
 
   # [FULL] empty-error-handler: completely empty catch blocks
   # Replaces: src/detectors/empty-error-handler.ts (174 lines) — empty case
@@ -62,10 +60,9 @@ rules:
     reason: "Empty catch block silently swallows errors. Add error handling, re-throw, or add a comment."
     severity: warning
     language: typescript
-    expect-valid:
-      - "try { f() } catch(e) { handleError(e) }"
-    expect-invalid:
-      - "try { f() } catch(e) { }"
+    expect:
+      - valid: "try { f() } catch(e) { handleError(e) }"
+      - invalid: "try { f() } catch(e) { }"
 
   # [PARTIAL] empty-error-handler: catch blocks that only console.log
   - id: catch-block-log-only
@@ -79,10 +76,9 @@ rules:
     reason: "Catch block only logs the error without handling it. Add proper error recovery."
     severity: warning
     language: typescript
-    expect-valid:
-      - "try { f() } catch(e) { handleError(e); return fallback; }"
-    expect-invalid:
-      - "try { f() } catch(e) { console.log(e); }"
+    expect:
+      - valid: "try { f() } catch(e) { handleError(e); return fallback; }"
+      - invalid: "try { f() } catch(e) { console.log(e); }"
 
   # [FULL] todo-in-production: TODO/FIXME/HACK comments
   # Replaces: src/detectors/todo-in-production.ts (53 lines)
@@ -95,12 +91,11 @@ rules:
     reason: "TODO/FIXME comment in production code. Address it or create a tracked issue."
     severity: warning
     language: typescript
-    expect-valid:
-      - "// This is a regular comment"
-    expect-invalid:
-      - "// TODO: fix this"
-      - "// FIXME: broken"
-      - "// HACK: workaround"
+    expect:
+      - valid: "// This is a regular comment"
+      - invalid: "// TODO: fix this"
+      - invalid: "// FIXME: broken"
+      - invalid: "// HACK: workaround"
 
   # [PARTIAL] god-function: functions with too many parameters (>5)
   # Covers the parameter-count part of src/detectors/god-function.ts (250+ lines)
@@ -109,10 +104,9 @@ rules:
     reason: "Function has too many parameters (>5). Consider using an options object."
     severity: warning
     language: typescript
-    expect-valid:
-      - "function f(a: string, b: number, c: boolean) { }"
-    expect-invalid:
-      - "function f(a: string, b: number, c: boolean, d: object, e: any, f: string, g: number) { }"
+    expect:
+      - valid: "function f(a: string, b: number, c: boolean) { }"
+      - invalid: "function f(a: string, b: number, c: boolean, d: object, e: any, f: string, g: number) { }"
 
   # [PARTIAL] god-function: arrow functions with too many parameters
   - id: god-lambda-params
@@ -120,8 +114,8 @@ rules:
     reason: "Arrow function has too many parameters (>5). Consider using an options object."
     severity: warning
     language: typescript
-    expect-valid:
-      - "const f = (a: string, b: number) => a + b"
+    expect:
+      - valid: "const f = (a: string, b: number) => a + b"
 
   # ===========================================================================
   # SECURITY
@@ -142,10 +136,9 @@ rules:
     reason: "SQL query uses template literal with interpolation - potential SQL injection. Use parameterized queries."
     severity: error
     language: typescript
-    expect-valid:
-      - 'db.query("SELECT * FROM users WHERE id = $1", [id])'
-    expect-invalid:
-      - 'db.query(`SELECT * FROM users WHERE id = ${id}`)'
+    expect:
+      - valid: 'db.query("SELECT * FROM users WHERE id = $1", [id])'
+      - invalid: 'db.query(`SELECT * FROM users WHERE id = ${id}`)'
 
   # [PARTIAL] sql-injection: string concatenation in query calls
   - id: sql-injection-concat
@@ -160,10 +153,9 @@ rules:
     reason: "SQL query built with string concatenation - potential SQL injection. Use parameterized queries."
     severity: error
     language: typescript
-    expect-valid:
-      - 'db.query("SELECT * FROM users WHERE id = $1", [id])'
-    expect-invalid:
-      - 'db.query("SELECT * FROM users WHERE id = " + id)'
+    expect:
+      - valid: 'db.query("SELECT * FROM users WHERE id = $1", [id])'
+      - invalid: 'db.query("SELECT * FROM users WHERE id = " + id)'
 
   # [FULL] insecure-defaults: eval() usage
   # Part of src/detectors/insecure-defaults.ts (434 lines)
@@ -172,10 +164,9 @@ rules:
     reason: "eval() executes arbitrary code and is a security risk. Use JSON.parse() for data or refactor."
     severity: error
     language: typescript
-    expect-valid:
-      - "JSON.parse(data)"
-    expect-invalid:
-      - "eval(userInput)"
+    expect:
+      - valid: "JSON.parse(data)"
+      - invalid: "eval(userInput)"
 
   # [FULL] insecure-defaults: new Function()
   - id: new-function-usage
@@ -183,10 +174,9 @@ rules:
     reason: "new Function() creates functions from strings - security risk. Use static function definitions."
     severity: error
     language: typescript
-    expect-valid:
-      - 'new RegExp(".*")'
-    expect-invalid:
-      - 'new Function("return " + code)'
+    expect:
+      - valid: 'new RegExp(".*")'
+      - invalid: 'new Function("return " + code)'
 
   # [FULL] insecure-defaults: rejectUnauthorized: false
   - id: tls-verification-disabled
@@ -194,10 +184,9 @@ rules:
     reason: "TLS certificate verification is disabled. Remove rejectUnauthorized: false."
     severity: error
     language: typescript
-    expect-valid:
-      - "const opts = { rejectUnauthorized: true }"
-    expect-invalid:
-      - "const opts = { rejectUnauthorized: false }"
+    expect:
+      - valid: "const opts = { rejectUnauthorized: true }"
+      - invalid: "const opts = { rejectUnauthorized: false }"
 
   # [FULL] token-in-localstorage: auth tokens in localStorage/sessionStorage
   # Replaces: src/detectors/token-in-localstorage.ts
@@ -218,12 +207,11 @@ rules:
     reason: "Auth token stored in localStorage/sessionStorage - vulnerable to XSS. Use httpOnly cookies."
     severity: error
     language: typescript
-    expect-valid:
-      - 'localStorage.setItem("theme", "dark")'
-      - 'localStorage.setItem("language", "en")'
-    expect-invalid:
-      - 'localStorage.setItem("auth_token", jwt)'
-      - 'sessionStorage.setItem("jwt", token)'
+    expect:
+      - valid: 'localStorage.setItem("theme", "dark")'
+      - valid: 'localStorage.setItem("language", "en")'
+      - invalid: 'localStorage.setItem("auth_token", jwt)'
+      - invalid: 'sessionStorage.setItem("jwt", token)'
 
   # ===========================================================================
   # CORRECTNESS
@@ -236,10 +224,9 @@ rules:
     reason: "Await inside for-of loop may cause N+1 query. Consider batching with Promise.all or WHERE IN."
     severity: warning
     language: typescript
-    expect-valid:
-      - "for (const item of items) { process(item); }"
-    expect-invalid:
-      - "for (const id of ids) { const u = await db.find(id); }"
+    expect:
+      - valid: "for (const item of items) { process(item); }"
+      - invalid: "for (const id of ids) { const u = await db.find(id); }"
 
   # [PARTIAL] n-plus-one-query: .map(async ... await ...)
   - id: n-plus-one-async-map
@@ -252,7 +239,6 @@ rules:
     reason: "Async map with await may cause N+1 query. Batch operations or use Promise.all."
     severity: warning
     language: typescript
-    expect-valid:
-      - "items.map((item) => item.name)"
-    expect-invalid:
-      - "items.map(async (item) => { await db.create(item); })"
+    expect:
+      - valid: "items.map((item) => item.name)"
+      - invalid: "items.map(async (item) => { await db.create(item); })"

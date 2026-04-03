@@ -106,12 +106,11 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
   reason: "Debug console statement left in production code."
   severity: warning
   language: typescript
-  expect-valid:
-    - 'console.error("legit error")'
-    - 'console.warn("legit warning")'
-  expect-invalid:
-    - 'console.log("debug")'
-    - 'console.debug("trace")'
+  expect:
+    - valid: 'console.error("legit error")'
+    - valid: 'console.warn("legit warning")'
+    - invalid: 'console.log("debug")'
+    - invalid: 'console.debug("trace")'
 ```
 
 ### Example 2: `sql-injection` (template literal variant)
@@ -140,10 +139,9 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
   reason: "SQL query with template interpolation - potential injection"
   severity: error
   language: typescript
-  expect-valid:
-    - 'db.query("SELECT * FROM users WHERE id = $1", [id])'
-  expect-invalid:
-    - 'db.query(`SELECT * FROM users WHERE id = ${id}`)'
+  expect:
+    - valid: 'db.query("SELECT * FROM users WHERE id = $1", [id])'
+    - invalid: 'db.query(`SELECT * FROM users WHERE id = ${id}`)'
 ```
 
 ### Example 3: `double-type-assertion`
@@ -166,10 +164,9 @@ const doubleAssertRe2 = /\bas\s+any\s+as\s+/;
   reason: "Double type assertion bypasses TypeScript type safety."
   severity: warning
   language: typescript
-  expect-valid:
-    - "const x = value as string"
-  expect-invalid:
-    - "const x = value as unknown as string"
+  expect:
+    - valid: "const x = value as string"
+    - invalid: "const x = value as unknown as string"
 ```
 
 The XPath version is not only shorter — it's structurally correct (matching nested
@@ -202,10 +199,9 @@ AST nodes) while VibeCop's regex approach can false-positive on comments and str
     ]
   reason: "Auth token in localStorage - vulnerable to XSS"
   severity: error
-  expect-valid:
-    - 'localStorage.setItem("theme", "dark")'
-  expect-invalid:
-    - 'localStorage.setItem("auth_token", jwt)'
+  expect:
+    - valid: 'localStorage.setItem("theme", "dark")'
+    - invalid: 'localStorage.setItem("auth_token", jwt)'
 ```
 
 ---
@@ -284,6 +280,33 @@ usability burden.
 
 **Suggestion**: Unify the format, or document them side-by-side with clear
 "use this when..." guidance.
+
+#### 4. Unknown YAML Keys Are Silently Ignored in `--rules`
+
+**Severity: Footgun**
+
+When writing rules in `--rules` YAML, unknown keys are silently accepted and
+ignored. I initially wrote `expect-valid:` and `expect-invalid:` (by analogy with
+the CLI flags `--expect-valid` / `--expect-invalid`) instead of the correct format:
+
+```yaml
+# WRONG — silently ignored, no validation happens:
+expect-valid:
+  - "JSON.parse(data)"
+expect-invalid:
+  - "eval(userInput)"
+
+# CORRECT — actually validates:
+expect:
+  - valid: "JSON.parse(data)"
+  - invalid: "eval(userInput)"
+```
+
+The wrong format produces zero errors or warnings. You only discover it when you
+intentionally break an example and nothing happens.
+
+**Suggestion**: Warn on unknown keys in rule definitions, or at minimum reject keys
+that look like misspelled versions of known fields (`expect-valid` vs `expect`).
 
 ---
 
@@ -417,8 +440,9 @@ isn't documented in `--help`. I had to discover it through error messages:
 invalid type: sequence, expected struct RulesConfig
 ```
 
-...which told me to wrap rules in a `rules:` key. The `language`, `expect-valid`,
-and `expect-invalid` fields were discovered by analogy with CLI flags.
+...which told me to wrap rules in a `rules:` key. The `language` and `expect`
+fields were discovered by analogy with CLI flags (see also issue #4 — `expect-valid`
+and `expect-invalid` are silently ignored in favor of `expect: [{valid: ...}]`).
 
 **Suggestion**: Add a `--rules` format example to `tractor check --help` or document
 it in a rules authoring guide.
