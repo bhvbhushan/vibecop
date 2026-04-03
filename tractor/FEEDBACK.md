@@ -494,21 +494,32 @@ A couple of things that could help discoverability:
   still be useful for rule authors who want a quick reference without having
   their own codebase handy
 
-#### 14. No Way to Exclude Files in `check --rules`
+#### 14. ~~No Way to Exclude Files in `check --rules`~~ — RESOLVED
 
-**Tracking: Related to [boukeversteegh/tractor#53](https://github.com/boukeversteegh/tractor/issues/53) (changed-files limiting) and [boukeversteegh/tractor#65](https://github.com/boukeversteegh/tractor/pull/65) (format unification which includes `exclude`)**
+**Status: Already works! Both top-level and per-rule `exclude:` are supported in `--rules` YAML.**
 
-**Severity: Medium**
+I missed this during the experiment. The following both work:
 
-The `check --rules` workflow targets files via CLI glob, but there's no way to
-exclude patterns (test files, generated files, vendor directories). The `run`
-config format has `exclude:` but `check --rules` doesn't.
+```yaml
+# Top-level exclude
+exclude:
+  - "**/test-fixtures/**"
+rules:
+  - id: eval-usage
+    xpath: "//call[function='eval']"
+    ...
 
-For VibeCop, most rules skip test files. Currently the only option is to carefully
-craft the glob to exclude them, which is fragile.
+# Or per-rule exclude
+rules:
+  - id: eval-usage
+    xpath: "//call[function='eval']"
+    exclude:
+      - "**/test-fixtures/**"
+    ...
+```
 
-**Suggestion**: Add `--exclude` flag to `tractor check`, or support `exclude:` in
-the `--rules` YAML.
+This is another case where documenting the `--rules` YAML format (feedback #12)
+would have prevented the confusion.
 
 #### 15. Error Output on Exit Code 1
 
@@ -530,7 +541,7 @@ or similar to distinguish "tractor failed" from "tractor found problems".
 | P0 | Fix TSX/JSX parsing | `dangerous-inner-html`, `god-component` |
 | P0 | Document `check --rules` YAML format | All rules (usability) |
 | P1 | Line counting function | `god-function` (full), `excessive-comment-ratio` |
-| P1 | File exclude in `check --rules` | All rules (test file skipping) |
+| ~~P1~~ | ~~File exclude in `check --rules`~~ | Already works — undiscovered due to undocumented format (#12) |
 | P1 | Unify `run` / `check --rules` config | Usability |
 | P2 | Cyclomatic complexity helper or docs | `god-function` (full) |
 | P2 | Node text comparison | `dead-code-path`, `trivial-assertion` |
@@ -570,10 +581,8 @@ repository and should be filed as GitHub issues:
 - **Ref**: Feedback #12 above
 - **Summary**: The `--rules` flag accepts a YAML file but the expected format (`rules: [{id, xpath, reason, severity, language, expect}]`) is not documented in `--help` or anywhere else. Discovery is entirely through error messages and trial-and-error.
 
-### 6. Feature: `--exclude` glob for `tractor check`
-- **Labels**: enhancement
-- **Ref**: Feedback #14 above, related to [boukeversteegh/tractor#53](https://github.com/boukeversteegh/tractor/issues/53)
-- **Summary**: `tractor check` has no way to exclude files (test files, generated code, vendor dirs). The `run` config has `exclude:` but `check --rules` doesn't. Add `--exclude` CLI flag or support `exclude:` in the rules YAML.
+### ~~6. Feature: `--exclude` glob for `tractor check`~~ — NOT NEEDED
+Already supported via `exclude:` in the `--rules` YAML (both top-level and per-rule). See feedback #14.
 
 ### 7. DX: make `-v schema` more discoverable for rule authoring
 - **Labels**: enhancement, dx
