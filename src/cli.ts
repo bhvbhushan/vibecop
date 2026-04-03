@@ -268,6 +268,14 @@ function main(): void {
     .option("--group-by <mode>", "Group findings by 'file' or 'rule'", "file")
     .action(checkAction);
 
+  program
+    .command("init")
+    .description("Set up vibecop integration with AI coding tools")
+    .action(async () => {
+      const { runInit } = await import("./init.js");
+      await runInit();
+    });
+
   program.parse();
 }
 
