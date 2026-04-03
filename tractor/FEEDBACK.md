@@ -237,26 +237,23 @@ Expected: proper `jsx_element` / `jsx_self_closing_element` nodes.
 **Impact**: Blocks 2 VibeCop rules (`dangerous-inner-html`, `god-component`) and
 any future React/JSX-specific rules.
 
-#### 2. `tractor run` Hangs on File-Based Configs
+#### 2. ~~`tractor run` Hangs on File-Based Configs~~ — LIKELY USER ERROR
 
-**Tracking: Related to [todo/20-glob-path-resolution-in-configs.md](https://github.com/boukeversteegh/tractor/blob/main/todo/20-glob-path-resolution-in-configs.md) (silent glob failures) — hang itself [needs new issue](#new-issues-to-file)**
+**Tracking: [todo/20-glob-path-resolution-in-configs.md](https://github.com/boukeversteegh/tractor/blob/main/todo/20-glob-path-resolution-in-configs.md) (glob path resolution)**
 
-**Severity: Major**
+**Severity: ~~Major~~ → Low (documentation issue)**
 
-`tractor run config.yaml` appears to hang indefinitely when the config references
-files (vs. inline data). Tested with various path styles (relative, absolute, glob).
-The same queries work fine via `tractor check file --rules rules.yaml`.
+During the experiment I placed config files in `/tmp` and referenced files like
+`files: ["poc/test-fixtures/src/*.ts"]`. Since `tractor run` resolves globs
+relative to the config file's directory, this would have searched `/tmp/poc/...`
+(no match) or, with broader globs, scanned the entire `/tmp` drive — explaining
+the apparent hang.
 
-```bash
-# This hangs:
-tractor run rules.yaml  # where rules.yaml has files: ["src/bad-code.ts"]
+This is exactly the problem described in `todo/20`: globs resolve relative to the
+config file with no warning when they match nothing (or match way too much).
 
-# This works:
-tractor check "src/bad-code.ts" --rules rules.yaml
-```
-
-**Suggestion**: Either fix `tractor run` for check operations, or document clearly
-that `check --rules` is the intended way to run batch lint rules.
+**Suggestion**: Warn when file globs match 0 files, and/or show the resolved base
+directory in `--verbose` output.
 
 #### 3. `tractor run` and `tractor check --rules` Use Different Config Formats
 
@@ -561,10 +558,10 @@ repository and should be filed as GitHub issues:
 - **Summary**: `tractor -l tsx` misparses JSX elements like `<div className="test">` as TypeScript type assertions (`<type_arguments>`). This blocks all React/JSX-specific linting rules.
 - **Repro**: `echo 'const x = <div className="test">hello</div>;' | tractor -l tsx`
 
-### 2. `tractor run` hangs when config references file globs
-- **Labels**: bug
-- **Ref**: Feedback #2 above
-- **Summary**: `tractor run config.yaml` hangs indefinitely when the config's `files:` field references file globs that match real files. Same queries work via `tractor check file --rules rules.yaml`. Tested on Windows with tractor from PATH.
+### ~~2. `tractor run` hangs when config references file globs~~ — LIKELY USER ERROR
+Caused by placing config in `/tmp`, so globs resolved relative to `/tmp` instead
+of the project directory. Already tracked in [todo/20](https://github.com/boukeversteegh/tractor/blob/main/todo/20-glob-path-resolution-in-configs.md)
+(warn on 0-match globs, document path resolution).
 
 ### 3. Unknown YAML keys silently ignored in `check --rules`
 - **Labels**: bug, dx
