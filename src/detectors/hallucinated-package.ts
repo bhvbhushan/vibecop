@@ -1,15 +1,9 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join, basename } from "node:path";
+import { basename } from "node:path";
 import type { Detector, DetectionContext, Finding } from "../types.js";
 import { makeLineFinding } from "./utils.js";
+import knownPackagesData from "../data/known-packages.json";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const knownPackages: string[] = JSON.parse(
-  readFileSync(join(__dirname, "../data/known-packages.json"), "utf-8"),
-);
-
-const KNOWN_SET = new Set<string>(knownPackages);
+const KNOWN_SET = new Set<string>(knownPackagesData as string[]);
 
 /**
  * Common scoped-package prefixes from known organizations.
