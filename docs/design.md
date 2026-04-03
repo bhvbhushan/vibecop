@@ -1,13 +1,13 @@
-# aiqt — AI Code Quality Toolkit: Design & Implementation Plan
+# vibecop — AI Code Quality Toolkit: Design & Implementation Plan
 
-**Date:** 2026-04-01
-**Status:** Engineering Review Complete / Ready for Implementation
+**Date:** 2026-04-03
+**Status:** Engineering Review Complete / Ready for Implementation | v0.2 Implementation Complete
 
 ---
 
 ## Overview
 
-The open-source linter purpose-built for the AI coding era. Detects AI-specific code antipatterns that traditional tools miss: hallucinated imports, over-mocking, trivial assertions, insecure defaults, excessive comments. Runs in CI in under 60 seconds, requires no API keys, fully deterministic, zero network calls.
+**vibecop** — the open-source linter purpose-built for the AI coding era. Detects AI-specific code antipatterns that traditional tools miss: hallucinated imports, over-mocking, trivial assertions, insecure defaults, excessive comments, LLM API misuse, and unsafe shell execution. Ships 28 detectors, integrates with 7+ AI coding tools via `vibecop init`, and runs in CI in under 60 seconds. Requires no API keys, fully deterministic, zero network calls.
 
 ## Problem Statement
 
@@ -34,7 +34,7 @@ The open-source linter purpose-built for the AI coding era. Detects AI-specific 
 | SonarQube CE | Yes | No (paid only) | Partial | Yes | No | Yes |
 | Qodo/PR-Agent | LLM-based | No | Yes | No | Partial | Yes |
 | Semgrep | Yes | No catalog | No | Yes | No | Yes |
-| **aiqt** | **Yes** | **Yes (core)** | **Yes** | **Yes** | **Yes** | **Yes** |
+| **vibecop** | **Yes** | **Yes (core)** | **Yes** | **Yes** | **Yes** | **Yes** |
 
 ### Key Competitor Details
 
@@ -55,6 +55,16 @@ The open-source linter purpose-built for the AI coding era. Detects AI-specific 
 3. **Slopsquatting** (USENIX Security 2025) — 576K code samples, 16 LLMs: 19.7% hallucinated packages. 43% consistently hallucinated across prompts.
 4. **AI Detection Unreliable** (arxiv 2411.04299) — Stylometric authorship detection fails. Focus on quality patterns, not authorship.
 
+### SpecDetect4LLM Mapping (v0.2)
+
+| SpecDetect4LLM ID | Smell | vibecop Detector | Status |
+|-------------------|-------|------------------|--------|
+| UMM | Unbounded Max Metrics | llm-call-no-timeout | Implemented |
+| NMVP | No Model Version Pinning | llm-unpinned-model | Implemented |
+| NSM | No System Message | llm-no-system-message | Implemented |
+| TNES | Temperature Not Explicitly Set | llm-temperature-not-set | Implemented |
+| NSO | No Structured Output | — | Deferred (requires downstream parse detection) |
+
 ---
 
 ## Engineering Review Decisions
@@ -62,15 +72,15 @@ The open-source linter purpose-built for the AI coding era. Detects AI-specific 
 The following 10 decisions were finalized during engineering and CEO review and supersede all earlier design notes:
 
 1. **Parser: @ast-grep/napi** — 13K stars, 9 platform binaries, 10-50x faster than raw tree-sitter, ships pre-built native binaries via napi-rs. tree-sitter is NOT used directly.
-2. **Single package** — No monorepo, no `@aiqt/cli` / `@aiqt/core` split. Single `aiqt` npm package.
+2. **Single package** — No monorepo, no `@vibecop/cli` / `@vibecop/core` split. Single `vibecop` npm package.
 3. **Bun for build/test/run** — `bun test` (not Vitest), `bun build` (not tsup). Node.js 20+ for end-user runtime compatibility.
 4. **Text-default output** — Text is the default `--format`. SARIF is optional, not primary.
-5. **7 detectors for v0.1** — Scope is fixed: undeclared-import, empty-error-handler, trivial-assertion, excessive-comment-ratio, over-defensive-coding, insecure-defaults, over-mocking.
+5. **7 detectors for v0.1, 28 in v0.2** — v0.1 scope: undeclared-import, empty-error-handler, trivial-assertion, excessive-comment-ratio, over-defensive-coding, insecure-defaults, over-mocking. v0.2 adds 21 additional detectors.
 6. **Lock-file validation (no network)** — Parse `package.json`, lock files, and `requirements.txt` to answer "Is this import declared?" Zero network calls, zero overhead.
 7. **Deferred detectors** — hallucinated-api-call, copy-paste-duplication, tautological-test, over-abstraction, buzzword-comments are explicitly out of v0.1 scope.
-8. **No YAML rule format in v0.1** — All 7 detectors are implemented in TypeScript. No YAML DSL in this version.
-9. **Config: `.aiqt.yml`** — Loaded at startup, validated with Zod, minimal schema.
-10. **Languages v0.1: JS, TS, TSX, Python** — JS/TS/TSX built-in to @ast-grep/napi; Python via `@ast-grep/lang-python` + `registerDynamicLanguage()`.
+8. **No YAML rule format** — All detectors are implemented in TypeScript. No YAML DSL.
+9. **Config: `.vibecop.yml`** — Loaded at startup, validated with Zod, minimal schema.
+10. **Languages: JS, TS, TSX, Python** — JS/TS/TSX built-in to @ast-grep/napi; Python via `@ast-grep/lang-python` + `registerDynamicLanguage()`.
 
 ---
 
@@ -79,34 +89,45 @@ The following 10 decisions were finalized during engineering and CEO review and 
 ### File Layout
 
 ```
-aiqt/                           ← single npm package
+vibecop/                        ← single npm package
 ├── src/
-│   ├── cli.ts                  ← Commander.js entry (scan, check commands)
-│   ├── engine.ts               ← File discovery, detector runner, report builder
-│   ├── config.ts               ← .aiqt.yml loading + Zod validation
+│   ├── cli.ts                  ← Commander.js entry (scan, check, init commands)
+│   ├── engine.ts               ← File discovery, detector runner, dedup, report builder
+│   ├── config.ts               ← .vibecop.yml loading + Zod validation
 │   ├── project.ts              ← Parse package.json, lock files, manifests → ProjectInfo
+│   ├── init.ts                 ← vibecop init setup wizard
 │   ├── formatters/
 │   │   ├── text.ts             ← Default: stylish terminal output
 │   │   ├── json.ts             ← Programmatic JSON
 │   │   ├── sarif.ts            ← Optional SARIF 2.1.0 (~80 LOC hand-rolled)
 │   │   ├── github.ts           ← ::error annotations + GITHUB_STEP_SUMMARY
-│   │   └── html.ts             ← Single-file HTML report
+│   │   ├── html.ts             ← Single-file HTML report
+│   │   └── agent.ts            ← Agent output format (token-efficient, one finding per line)
 │   ├── detectors/
+│   │   ├── utils.ts            ← makeFinding/makeLineFinding helpers
 │   │   ├── undeclared-import.ts
 │   │   ├── empty-error-handler.ts
 │   │   ├── trivial-assertion.ts
 │   │   ├── excessive-comment-ratio.ts
 │   │   ├── over-defensive-coding.ts
 │   │   ├── insecure-defaults.ts
-│   │   └── over-mocking.ts
+│   │   ├── over-mocking.ts
+│   │   └── ... (21 additional detectors)
+│   ├── data/
+│   │   └── known-packages.json ← Bundled npm allowlist for hallucinated-package detection
 │   └── types.ts                ← Detector, DetectionContext, Finding, ProjectInfo, etc.
 ├── test/
+├── examples/                   ← Example configs for 7 AI coding tools
 ├── package.json
 ├── tsconfig.json
-├── .aiqt.yml                   ← Self-dogfood config
+├── .vibecop.yml                ← Self-dogfood config
 └── docs/
     └── design.md               ← This file
 ```
+
+### Engine Dedup
+
+When multiple detectors flag the same file:line, the engine keeps only the highest-priority finding. Priority is set via `DetectorMeta.priority` (default: 0). New agent/LLM detectors use `priority: 10`.
 
 ### Tech Stack
 
@@ -121,7 +142,7 @@ aiqt/                           ← single npm package
 | Output: SARIF | @types/sarif (types only) | Hand-roll ~80 LOC serializer, no runtime dep |
 | Test | bun test | Built-in, no extra dependency |
 | Build | bun build | Built-in |
-| Distribution | npm (`npx aiqt scan`) | Largest reach |
+| Distribution | npm (`npx vibecop scan`) | Largest reach |
 
 ---
 
@@ -140,6 +161,7 @@ interface DetectorMeta {
   severity: 'error' | 'warning' | 'info';
   category: 'correctness' | 'quality' | 'security' | 'testing';
   languages: Lang[];
+  priority?: number;  // Higher priority wins in dedup (default: 0)
 }
 
 interface DetectionContext {
@@ -175,7 +197,7 @@ interface ProjectInfo {
 
 ```
 CLI args
-  → loadConfig(.aiqt.yml or defaults)
+  → loadConfig(.vibecop.yml or defaults)
   → loadProjectInfo(package.json, lock files, requirements.txt, pyproject.toml)
   → discoverFiles(path, config.ignore, .gitignore)
   → for each file:
@@ -183,6 +205,7 @@ CLI args
       → run each enabled detector(ctx) → Finding[]
       → isolate: if detector throws, log error, continue
   → aggregate all findings
+  → dedupFindings: group by file:line, keep highest priority
   → apply --max-findings N cap (default 50)
   → format(findings, --format flag)
   → exit(findings.length > 0 ? 1 : 0)
@@ -190,29 +213,34 @@ CLI args
 
 ---
 
-## CLI Commands (v0.1)
+## CLI Commands (v0.2)
 
 ```
-aiqt scan [path]
+vibecop scan [path]
   # Scan directory (default: cwd)
-  --format text|json|github|sarif|html   (default: text)
+  --format text|json|github|sarif|html|agent   (default: text)
   --config <path>
   --no-config
-  --max-findings N                        (default: 50)
-  --verbose                               (timing summary)
-  --diff <ref>                            (scan only changed files vs git ref)
-  --stdin-files                           (read file list from stdin)
+  --max-findings N                              (default: 50)
+  --verbose                                     (timing summary)
+  --diff <ref>                                  (scan only changed files vs git ref)
+  --stdin-files                                 (read file list from stdin)
 
-aiqt check <file>
+vibecop check <file>
   # Single file scan
-  --format text|json|github|sarif|html
+  --format text|json|github|sarif|html|agent
   --max-findings N
   --verbose
+
+vibecop init
+  # Auto-detect AI coding tools and generate integration configs
 ```
 
 ---
 
-## v0.1 Detectors (7)
+## Detectors (28 total)
+
+### Original v0.1 Detectors (7)
 
 | # | Detector | Category | Severity | Key Pattern |
 |---|----------|----------|----------|-------------|
@@ -224,19 +252,57 @@ aiqt check <file>
 | 6 | insecure-defaults | security | error | Hardcoded secrets, `rejectUnauthorized: false`, `eval()` |
 | 7 | over-mocking | testing | warning | mock/spy count > assertion count in test files |
 
+### v0.1.x Additional Detectors (14)
+
+| # | Detector | Category | Severity | Key Pattern |
+|---|----------|----------|----------|-------------|
+| 8 | dead-code-path | quality | warning | Unreachable code after return/throw |
+| 9 | debug-console-in-prod | quality | warning | `console.log/debug` in non-test files |
+| 10 | double-type-assertion | quality | warning | `as unknown as T` double casts |
+| 11 | excessive-any | quality | warning | Overuse of `any` type annotation |
+| 12 | god-component | quality | warning | React component with too many responsibilities |
+| 13 | god-function | quality | warning | Function exceeding line/complexity threshold |
+| 14 | sql-injection | security | error | Dynamic SQL string concatenation |
+| 15 | dangerous-inner-html | security | error | `dangerouslySetInnerHTML` with dynamic content |
+| 16 | unbounded-query | security | warning | DB query without LIMIT clause |
+| 17 | mixed-concerns | quality | info | Business logic mixed with UI in component |
+| 18 | n-plus-one-query | quality | warning | DB query inside loop |
+| 19 | token-in-localstorage | security | warning | Auth token stored in localStorage |
+| 20 | placeholder-in-production | quality | error | Placeholder/TODO text in user-facing strings |
+| 21 | todo-in-production | quality | info | TODO/FIXME comments in production code |
+
+### v0.2 Agent Safety + LLM Detectors (6)
+
+| # | Detector | Source | Category | Severity | Pattern |
+|---|----------|--------|----------|----------|---------|
+| 22 | unsafe-shell-exec | OWASP Agentic | security | error | `exec()`/`execSync()` with dynamic arg, subprocess with `shell=True` |
+| 23 | llm-call-no-timeout | SpecDetect4LLM UMM | quality | warning | OpenAI/Anthropic constructor without timeout |
+| 24 | dynamic-code-exec | OWASP Agentic | security | error | `eval()`/`new Function()` with variable arg |
+| 25 | llm-unpinned-model | SpecDetect4LLM NMVP | quality | warning | Moving model aliases like `"gpt-4o"` |
+| 26 | llm-no-system-message | SpecDetect4LLM NSM | quality | info | Chat API call without system message |
+| 27 | llm-temperature-not-set | SpecDetect4LLM TNES | quality | info | LLM API call without temperature |
+
+### v0.2 Package Verification (1)
+
+| # | Detector | Source | Category | Severity | Pattern |
+|---|----------|--------|----------|----------|---------|
+| 28 | hallucinated-package | USENIX Security 2025 | correctness | info | Dependencies not in bundled npm allowlist |
+
 ### Detector Implementation Notes
 
 **undeclared-import:** Parses `package.json` deps, lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`), and `requirements.txt` / `pyproject.toml`. Answers "Is this import declared?" with zero network calls. Registry cross-reference is explicitly out of scope.
 
 **insecure-defaults:** Pattern-match only — no network lookups, no external validation.
 
-**excessive-comment-ratio:** Configurable threshold via `.aiqt.yml`. Default 0.5 (50% comment lines triggers warning).
+**excessive-comment-ratio:** Configurable threshold via `.vibecop.yml`. Default 0.5 (50% comment lines triggers warning).
 
-All detectors are implemented in TypeScript. No YAML rule format in v0.1.
+**hallucinated-package:** Cross-references imports against `src/data/known-packages.json`, a bundled allowlist derived from npm top packages. Zero network calls.
+
+All detectors are implemented in TypeScript. No YAML rule format.
 
 ---
 
-## Configuration (.aiqt.yml)
+## Configuration (.vibecop.yml)
 
 Minimal schema, validated with Zod at startup. Example:
 
@@ -255,7 +321,7 @@ rules:
     severity: error
 ```
 
-Config is optional — aiqt runs with safe defaults if no `.aiqt.yml` is present (`--no-config` skips loading entirely).
+Config is optional — vibecop runs with safe defaults if no `.vibecop.yml` is present (`--no-config` skips loading entirely).
 
 ---
 
@@ -268,10 +334,35 @@ Config is optional — aiqt runs with safe defaults if no `.aiqt.yml` is present
 | github | `--format github` | `::error` annotations + `GITHUB_STEP_SUMMARY` |
 | sarif | `--format sarif` | Optional SARIF 2.1.0, GitHub Security tab upload |
 | html | `--format html` | Single-file HTML report |
+| agent | `--format agent` | AI coding tool hooks — one finding per line, no color, token-efficient |
 
 SARIF is optional, not the primary format. Hand-rolled ~80 LOC serializer, `@types/sarif` for types only.
 
 VS Code problem matcher pattern will be included in `package.json` for terminal integration.
+
+---
+
+## Agent Integration Architecture (v0.2)
+
+vibecop integrates with 7+ AI coding tools across 3 tiers:
+
+```
+TIER 1 — Deterministic hooks: Claude Code, Cursor, Codex CLI, Aider
+TIER 2 — LLM-mediated instructions: GitHub Copilot, Windsurf, Cline
+TIER 3 — MCP tools (deferred to v0.3): Continue.dev, Amazon Q, Zed
+```
+
+Data flow:
+
+```
+Agent generates code
+  → Hook fires: npx vibecop scan --diff HEAD --format agent
+  → stdout: one-per-line findings (exit 1)
+  → Agent reads findings, auto-corrects
+  → Hook re-runs: clean (exit 0) → proceed
+```
+
+`vibecop init` auto-detects installed tools and generates config files. See `docs/agent-integration.md` for full setup instructions.
 
 ---
 
@@ -283,12 +374,12 @@ The engine handles the following error conditions explicitly:
 - **ELOOP** — Symlink loop: log warning, skip, continue
 - **Detector throw** — Isolated per-detector: log error with detector id + file, continue with remaining detectors
 - **Detector timeout** — Per-detector timeout enforced; exceeded detectors are skipped with a warning
-- **EPIPE** — Piped output closed early (e.g. `aiqt scan | head`): exit cleanly, no stack trace
+- **EPIPE** — Piped output closed early (e.g. `vibecop scan | head`): exit cleanly, no stack trace
 - **Git errors** — `--diff` ref not found or not a git repo: clear error message, exit 1
 
 ---
 
-## Language Support (v0.1)
+## Language Support
 
 | Language | Support | How |
 |----------|---------|-----|
@@ -301,17 +392,20 @@ Language is auto-detected from file extension. Tier 2 languages (Go, Java, Rust)
 
 ---
 
-## What is NOT in v0.1
+## What is NOT in v0.2
 
 The following are explicitly deferred:
 
-- **Monorepo package structure** (`@aiqt/cli`, `@aiqt/core`, etc.)
+- **Monorepo package structure** (`@vibecop/cli`, `@vibecop/core`, etc.)
 - **YAML rule format** — detectors are TypeScript-only
-- **PR Gate GitHub Action** — Phase 2
 - **Test Quality Evaluator** — Phase 3
-- **Deferred detectors:** hallucinated-api-call, copy-paste-duplication, tautological-test, over-abstraction, buzzword-comments
+- **MCP server** — deferred to v0.3 (Continue.dev, Amazon Q, Zed)
+- **VS Code LSP integration**
+- **Deferred detectors:** unhandled-tool-exec, llm-no-structured-output, copy-paste-duplication, tautological-test, over-abstraction, buzzword-comments
+- **SpecDetect4AI Python ML smells**
+- **Custom rules / user-defined detectors**
 - **Auto-fix / code rewriting**
-- **`aiqt init`, `aiqt rules`, `aiqt explain` commands**
+- **`vibecop rules`, `vibecop explain` commands**
 - **Scoring weights / quality score**
 - **Online registry verification** (npm/PyPI cross-reference)
 - **poetry.lock, uv.lock, Pipfile.lock** parsing
@@ -321,17 +415,27 @@ The following are explicitly deferred:
 
 ## Phased Roadmap
 
-### Phase 1: Core Scanner CLI — v0.1 (current)
+### Phase 1: Core Scanner CLI — v0.1 (complete)
 
-7 detectors, single package, JS/TS/TSX/Python, text-default output, `.aiqt.yml` config, `aiqt scan` + `aiqt check` commands. `--diff`, `--stdin-files`, `--max-findings`, `--verbose`, `--format html` included per CEO review.
+7 detectors, single package, JS/TS/TSX/Python, text-default output, `.vibecop.yml` config, `vibecop scan` + `vibecop check` commands. `--diff`, `--stdin-files`, `--max-findings`, `--verbose`, `--format html` included per CEO review.
 
-### Phase 2: PR Gate GitHub Action
+### Phase 2: PR Gate GitHub Action — DONE
 
 - Wraps core scanner
 - Diff-only analysis for speed target <60s
 - Inline PR comments + summary comment
 - Actions on failure: comment-only (default), request-changes, label, auto-close (opt-in)
-- Configuration extends `.aiqt.yml` with `pr-gate:` section
+- Configuration extends `.vibecop.yml` with `pr-gate:` section
+
+### Phase 2.5: Agent Integration + LLM/Safety Detectors + Package Verification — DONE (v0.2)
+
+- 7 new detectors: 6 agent/LLM safety detectors (unsafe-shell-exec, llm-call-no-timeout, dynamic-code-exec, llm-unpinned-model, llm-no-system-message, llm-temperature-not-set) + hallucinated-package
+- Agent output format (`--format agent`): token-efficient, one finding per line, no color
+- `vibecop init` wizard: auto-detects 7 AI coding tools and generates integration configs
+- Engine dedup with `DetectorMeta.priority` field — keeps highest-priority finding per file:line
+- `makeFinding`/`makeLineFinding` DRY refactor in `src/detectors/utils.ts`
+- Control benchmarks: precision/recall measured against labeled test suite
+- SpecDetect4LLM mapping: UMM, NMVP, NSM, TNES implemented; NSO deferred
 
 ### Phase 3: Test Quality Evaluator
 
@@ -356,7 +460,7 @@ Score = weighted_average(
 
 ## Positioning
 
-> **aiqt** — the open-source linter for the AI coding era. Deterministic, free, offline. Not an AI detector. Not an LLM-based reviewer. The quality tool SonarQube and ESLint weren't designed to be.
+> **vibecop** — the open-source linter for the AI coding era. Deterministic, free, offline. Not an AI detector. Not an LLM-based reviewer. The quality tool SonarQube and ESLint weren't designed to be.
 
 ## What This Is NOT
 
