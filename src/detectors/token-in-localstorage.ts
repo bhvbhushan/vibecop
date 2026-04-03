@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -36,18 +37,14 @@ function detect(ctx: DetectionContext): Finding[] {
     if (!SENSITIVE_KEYS.test(keyArg.text())) continue;
 
     const storage = object.text();
-    const range = call.range();
-    findings.push({
-      detectorId: "token-in-localstorage",
-      message: `Auth token stored in ${storage} — vulnerable to XSS attacks`,
-      severity: "error",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Use httpOnly cookies for auth tokens instead of browser storage",
-    });
+    findings.push(makeFinding(
+      "token-in-localstorage",
+      ctx,
+      call,
+      `Auth token stored in ${storage} — vulnerable to XSS attacks`,
+      "error",
+      "Use httpOnly cookies for auth tokens instead of browser storage",
+    ));
   }
 
   return findings;

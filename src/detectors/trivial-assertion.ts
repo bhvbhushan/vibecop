@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 /**
  * Detects test assertions that prove nothing:
@@ -91,36 +92,29 @@ function detectJavaScriptTrivialAssertions(ctx: DetectionContext): Finding[] {
       if (!LITERAL_KINDS_JS.has(expectArg.kind() as string)) continue;
 
       const methodName = property.text();
-      const range = call.range();
 
       // Check for toBeTruthy() with true, toBeFalsy() with false
       if (methodName === "toBeTruthy" && expectArg.text() === "true") {
-        findings.push({
-          detectorId: "trivial-assertion",
-          message: "Trivial assertion: expect(true).toBeTruthy() always passes",
-          severity: "warning",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Replace with a meaningful assertion that tests actual behavior",
-        });
+        findings.push(makeFinding(
+          "trivial-assertion",
+          ctx,
+          call,
+          "Trivial assertion: expect(true).toBeTruthy() always passes",
+          "warning",
+          "Replace with a meaningful assertion that tests actual behavior",
+        ));
         continue;
       }
 
       if (methodName === "toBeFalsy" && expectArg.text() === "false") {
-        findings.push({
-          detectorId: "trivial-assertion",
-          message: "Trivial assertion: expect(false).toBeFalsy() always passes",
-          severity: "warning",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Replace with a meaningful assertion that tests actual behavior",
-        });
+        findings.push(makeFinding(
+          "trivial-assertion",
+          ctx,
+          call,
+          "Trivial assertion: expect(false).toBeFalsy() always passes",
+          "warning",
+          "Replace with a meaningful assertion that tests actual behavior",
+        ));
         continue;
       }
 
@@ -147,17 +141,14 @@ function detectJavaScriptTrivialAssertions(ctx: DetectionContext): Finding[] {
       }
 
       if (areSame) {
-        findings.push({
-          detectorId: "trivial-assertion",
-          message: `Trivial assertion: expect(${expectArg.text()}).${methodName}(${matcherArg.text()}) always passes`,
-          severity: "warning",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Replace with a meaningful assertion that tests actual behavior",
-        });
+        findings.push(makeFinding(
+          "trivial-assertion",
+          ctx,
+          call,
+          `Trivial assertion: expect(${expectArg.text()}).${methodName}(${matcherArg.text()}) always passes`,
+          "warning",
+          "Replace with a meaningful assertion that tests actual behavior",
+        ));
       }
     }
   }
@@ -177,21 +168,17 @@ function detectPythonTrivialAssertions(ctx: DetectionContext): Finding[] {
     if (children.length < 2) continue;
 
     const expr = children[1];
-    const range = assertNode.range();
 
     // assert True / assert False
     if (expr.kind() === "true" || expr.kind() === "false") {
-      findings.push({
-        detectorId: "trivial-assertion",
-        message: `Trivial assertion: assert ${expr.text()} always ${expr.kind() === "true" ? "passes" : "fails"}`,
-        severity: "warning",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Replace with a meaningful assertion that tests actual behavior",
-      });
+      findings.push(makeFinding(
+        "trivial-assertion",
+        ctx,
+        assertNode,
+        `Trivial assertion: assert ${expr.text()} always ${expr.kind() === "true" ? "passes" : "fails"}`,
+        "warning",
+        "Replace with a meaningful assertion that tests actual behavior",
+      ));
       continue;
     }
 
@@ -217,17 +204,14 @@ function detectPythonTrivialAssertions(ctx: DetectionContext): Finding[] {
           }
 
           if (areSame) {
-            findings.push({
-              detectorId: "trivial-assertion",
-              message: `Trivial assertion: assert ${left.text()} == ${right.text()} always passes`,
-              severity: "warning",
-              file: ctx.file.path,
-              line: range.start.line + 1,
-              column: range.start.column + 1,
-              endLine: range.end.line + 1,
-              endColumn: range.end.column + 1,
-              suggestion: "Replace with a meaningful assertion that tests actual behavior",
-            });
+            findings.push(makeFinding(
+              "trivial-assertion",
+              ctx,
+              assertNode,
+              `Trivial assertion: assert ${left.text()} == ${right.text()} always passes`,
+              "warning",
+              "Replace with a meaningful assertion that tests actual behavior",
+            ));
           }
         }
       }

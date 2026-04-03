@@ -6,7 +6,7 @@
 [![CI](https://github.com/bhvbhushan/vibecop/actions/workflows/ci.yml/badge.svg)](https://github.com/bhvbhushan/vibecop/actions/workflows/ci.yml)
 [![Playground](https://img.shields.io/badge/Try-Playground-orange)](https://vibecop-pg.bhvbhushan7.com/)
 
-AI code quality toolkit — deterministic linter for the AI coding era. Catches the bugs that AI agents introduce: god functions, N+1 queries, fire-and-forget DB calls, leftover debug logging, and 18 more patterns. Like `eslint` for structural quality, but focused on the antipatterns AI generates.
+AI code quality toolkit — deterministic linter for the AI coding era. 28 detectors catch the bugs AI agents introduce: god functions, N+1 queries, unsafe shell exec, unpinned LLM models, and more. Runs automatically inside Claude Code, Cursor, Codex, Aider, and 3 other AI tools via `vibecop init`.
 
 Built on [ast-grep](https://ast-grep.github.io/) for fast, tree-sitter-based AST analysis. No LLM required — every finding is deterministic and reproducible.
 
@@ -45,24 +45,115 @@ vibecop scan . --format text
 vibecop scan . --config .vibecop.yml
 ```
 
+## Agent Integration
+
+vibecop runs automatically inside your AI coding agent. Every time the agent edits a file, vibecop scans the change and blocks on findings — the agent reads the output and fixes the issue before proceeding.
+
+### Auto-setup (recommended)
+
+```bash
+npx vibecop init
+```
+
+Detects which tools you have installed and generates the right config files:
+
+```
+  vibecop — agent integration setup
+
+  Detected tools:
+    ✓ Claude Code (.claude/ directory found)
+    ✓ Cursor (.cursor/ directory found)
+    ✓ Aider (aider installed)
+    ✗ Codex CLI (not found)
+
+  Generated:
+    .claude/settings.json     — PostToolUse hook (blocks on findings)
+    .cursor/hooks.json        — afterFileEdit hook
+    .cursor/rules/vibecop.md  — always-on lint rule
+    .aider.conf.yml           — lint-cmd per language
+
+  Done! vibecop will now run automatically in your agent workflow.
+```
+
+### Supported tools
+
+| Tool | Integration | How it works |
+|------|-------------|--------------|
+| **Claude Code** | PostToolUse hook | Runs after every Edit/Write, exit 1 blocks and forces fix |
+| **Cursor** | afterFileEdit hook + rules | Hook runs scan, rules file tells agent to fix findings |
+| **Codex CLI** | PostToolUse hook | Same pattern as Claude Code |
+| **Aider** | Native `--lint-cmd` | Built-in lint integration, runs after every edit |
+| **GitHub Copilot** | Custom instructions | Instructions file tells agent to run vibecop |
+| **Windsurf** | Rules file | `trigger: always_on` rule |
+| **Cline/Roo Code** | `.clinerules` | Rules file tells agent to run vibecop |
+
+### Manual setup (Claude Code example)
+
+Add to `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Edit|Write|MultiEdit",
+      "hooks": [{
+        "type": "command",
+        "command": "npx vibecop scan --diff HEAD --format agent"
+      }]
+    }]
+  }
+}
+```
+
+### How the loop works
+
+```
+Agent writes code
+  → vibecop hook fires automatically
+  → Findings? Exit 1 → agent reads output, fixes code
+  → No findings? Exit 0 → agent continues
+```
+
+The `--format agent` output is token-efficient (one finding per line, ~30 tokens each):
+
+```
+src/api.ts:42:1 error unsafe-shell-exec: execSync() with template literal. Use execFile() with argument array instead.
+src/llm.ts:18:5 warning llm-unpinned-model: Unpinned model alias "gpt-4o". Pin to a dated version like "gpt-4o-2024-08-06".
+```
+
+See [docs/agent-integration.md](docs/agent-integration.md) for full setup instructions and troubleshooting.
+
 ## Benchmarks
 
-Tested against 10 popular open-source vibe-coded projects (April 2026). These are real results, not synthetic:
+### Vibe-coded vs established: finding density comparison
 
-| Project | Stars | Files | Findings | Key Issues Found |
-|---------|:-----:|:-----:|:--------:|------------------|
-| [**context7**](https://github.com/upstash/context7) | 51.3K | 68 | 118 | 71 console.logs, 21 god functions, 3 N+1 queries |
-| [**dyad**](https://github.com/dyad-sh/dyad) | 20K | 970 | 1,104 | 402 god functions, 47 unchecked DB results, 12 placeholder values |
-| [**bolt.diy**](https://github.com/stackblitz-labs/bolt.diy) | 19.2K | 398 | 949 | 294 `any` types, 9 `dangerouslySetInnerHTML`, 24 N+1 queries |
-| [**screenpipe**](https://github.com/screenpipe/screenpipe) | 17.9K | 362 | 1,340 | 387 `any` types, 236 empty error handlers, 3 dead code paths |
-| [**browser-tools-mcp**](https://github.com/AgentDeskAI/browser-tools-mcp) | 7.2K | 12 | 420 | 319 console.logs, 49 `any` types, 15 empty error handlers |
-| [**magic-mcp**](https://github.com/21st-dev/magic-mcp) | 4.6K | 14 | 28 | 22 console.logs, 3 empty error handlers, 3 god functions |
-| [**code-review-graph**](https://github.com/tirth8205/code-review-graph) | 3.9K | 94 | 410 | 139 unchecked DB results, 71 N+1 queries, 6 SQL injections |
-| [**vibe-check-mcp**](https://github.com/PV-Bhat/vibe-check-mcp-server) | 480 | 53 | 113 | 74 console.logs, 18 `any` types, 9 god functions |
-| [**codeledger**](https://github.com/bhvbhushan/codeledger) | 3 | 54 | 30 | 13 god functions, 6 SQL injections, 5 `any` types |
-| [**mcptest**](https://github.com/bhvbhushan/mcptest) | — | 37 | 1 | 1 god function |
+All numbers below are real — run `vibecop scan` on any of these repos yourself to reproduce. Finding density = findings per 1,000 lines of code.
 
-**4,513 findings** across **2,062 files** in 10 vibe-coded projects. Most common antipatterns: god functions (38%), excessive `any` (21%), leftover `console.log` (26%).
+**Established projects (professionally maintained):**
+
+| Project | Stars | Files | LOC | Findings | Density |
+|---------|:-----:|:-----:|----:|:--------:|--------:|
+| [**fastify**](https://github.com/fastify/fastify) | 65K | 275 | 74,428 | 124 | 1.7/kLOC |
+| [**date-fns**](https://github.com/date-fns/date-fns) | 35K | 1,543 | 99,859 | 308 | 3.1/kLOC |
+| [**TanStack/query**](https://github.com/TanStack/query) | 43K | 997 | 148,492 | 652 | 4.4/kLOC |
+| [**express**](https://github.com/expressjs/express) | 66K | 141 | 21,346 | 123 | 5.8/kLOC |
+| [**zod**](https://github.com/colinhacks/zod) | 35K | 356 | 70,886 | 964 | 13.6/kLOC |
+
+**Vibe-coded projects (AI-generated/assisted):**
+
+| Project | Stars | Files | LOC | Findings | Density |
+|---------|:-----:|:-----:|----:|:--------:|--------:|
+| [**dyad**](https://github.com/dyad-sh/dyad) | 20K | 956 | 147,284 | 1,179 | 8.0/kLOC |
+| [**bolt.diy**](https://github.com/stackblitz-labs/bolt.diy) | 19.2K | 392 | 71,639 | 977 | 13.6/kLOC |
+| [**code-review-graph**](https://github.com/tirth8205/code-review-graph) | 3.9K | 95 | 27,119 | 361 | 13.3/kLOC |
+| [**context7**](https://github.com/upstash/context7) | 51.3K | 71 | 9,201 | 129 | 14.0/kLOC |
+| [**vibe-check-mcp**](https://github.com/PV-Bhat/vibe-check-mcp-server) | 480 | 55 | 5,964 | 119 | 20.0/kLOC |
+| [**magic-mcp**](https://github.com/21st-dev/magic-mcp) | 4.6K | 14 | 1,096 | 28 | 25.5/kLOC |
+| [**browser-tools-mcp**](https://github.com/AgentDeskAI/browser-tools-mcp) | 7.2K | 12 | 8,346 | 414 | 49.6/kLOC |
+
+**Median density: established 4.4/kLOC vs vibe-coded 14.0/kLOC (3.2x higher).** Vibe-coded projects consistently trigger more findings per line of code. The v0.2 detectors found **157 additional issues** across vibe-coded repos that v0.1 missed: 63 unsafe shell executions, 53 unpinned LLM models, 39 missing system messages.
+
+> **Note:** Some established repos show higher-than-expected density for valid reasons — zod uses `any` deliberately for type gymnastics (634 of its 964 findings), date-fns has extensive JSDoc (218 comment-ratio findings). vibecop detects patterns, not intent. Use `.vibecop.yml` to tune or disable detectors for your codebase.
 
 ### Example Output
 
@@ -87,9 +178,9 @@ src/utils/api.ts
 ✖ 9 problems (3 errors, 5 warnings, 1 info)
 ```
 
-## Detectors (22 total)
+## Detectors (28 total)
 
-### Quality (12 detectors)
+### Quality (16 detectors)
 
 | ID | Detector | Description | Severity |
 |----|----------|-------------|----------|
@@ -105,8 +196,12 @@ src/utils/api.ts
 | `empty-error-handler` | Empty Error Handler | Catch/except blocks that silently swallow errors | warning |
 | `excessive-comment-ratio` | Excessive Comment Ratio | Files with >50% comment lines | info |
 | `over-defensive-coding` | Over-Defensive Coding | Redundant null checks on values that can't be null | info |
+| `llm-call-no-timeout` | LLM Call No Timeout | `new OpenAI()`/`new Anthropic()` without timeout, `.create()` without max_tokens | warning |
+| `llm-unpinned-model` | LLM Unpinned Model | Moving model aliases like `"gpt-4o"` that silently change behavior | warning |
+| `llm-temperature-not-set` | LLM Temperature Not Set | LLM `.create()` calls without explicit `temperature` parameter | info |
+| `llm-no-system-message` | LLM No System Message | Chat API calls without a `role: "system"` message | info |
 
-### Security (5 detectors)
+### Security (7 detectors)
 
 | ID | Detector | Description | Severity |
 |----|----------|-------------|----------|
@@ -115,14 +210,17 @@ src/utils/api.ts
 | `token-in-localstorage` | Token in localStorage | Auth/JWT tokens stored in XSS-accessible storage | error |
 | `placeholder-in-production` | Placeholder in Production | `yourdomain.com`, `changeme`, `xxx` left in config | error |
 | `insecure-defaults` | Insecure Defaults | `eval()`, `rejectUnauthorized: false`, hardcoded credentials | error |
+| `unsafe-shell-exec` | Unsafe Shell Exec | `exec()`/`execSync()` with dynamic args, `subprocess` with `shell=True` | error |
+| `dynamic-code-exec` | Dynamic Code Exec | `eval(variable)`, `new Function(variable)` with non-literal arguments | error |
 
-### Correctness (3 detectors)
+### Correctness (4 detectors)
 
 | ID | Detector | Description | Severity |
 |----|----------|-------------|----------|
 | `unchecked-db-result` | Unchecked DB Result | Fire-and-forget database mutations (insert/update/delete) | warning |
 | `undeclared-import` | Undeclared Import | Imports not declared in package.json/requirements.txt | error |
 | `mixed-concerns` | Mixed Concerns | Files importing both UI frameworks and database/server libraries | warning |
+| `hallucinated-package` | Hallucinated Package | Dependencies not in top-5K npm allowlist (potential AI hallucination) | info |
 
 ### Testing (2 detectors)
 
@@ -203,7 +301,7 @@ pr-gate:
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--format` | Output format: `text`, `json`, `html`, `sarif`, `github` | `text` |
+| `--format` | Output format: `text`, `json`, `html`, `sarif`, `github`, `agent` | `text` |
 | `--config` | Path to config file | `.vibecop.yml` |
 | `--no-config` | Ignore config file | |
 | `--max-findings` | Maximum findings to report | `100` |
@@ -213,18 +311,19 @@ pr-gate:
 
 | Language | Extensions | Detectors |
 |----------|-----------|-----------|
-| TypeScript | `.ts`, `.tsx` | All 22 |
-| JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` | 18 (excludes TS-specific) |
-| Python | `.py` | 10 (correctness, quality, security) |
+| TypeScript | `.ts`, `.tsx` | All 28 |
+| JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` | 24 (excludes TS-specific) |
+| Python | `.py` | 14 (correctness, quality, security) |
 
 ## Architecture
 
 ```
 vibecop CLI (Commander)
-+-- Scan Engine           -- discovers files, loads AST, runs detectors, collects findings
++-- Scan Engine           -- discovers files, loads AST, runs detectors, dedup by priority
++-- Init Wizard           -- auto-detects AI tools, generates hook/rule configs
 +-- Config Loader (Zod)   -- validates .vibecop.yml, merges defaults, per-rule config
-+-- Detectors (22)        -- AST pattern matching via ast-grep (@ast-grep/napi)
-+-- Formatters (5)        -- text, json, csv, html, sarif output
++-- Detectors (28)        -- AST pattern matching via ast-grep (@ast-grep/napi)
++-- Formatters (6)        -- text, json, html, sarif, github, agent output
 +-- Project Analyzer      -- parses package.json, requirements.txt, lockfiles
 +-- GitHub Action          -- diff parser, finding filter, PR review poster
 ```
@@ -241,8 +340,9 @@ vibecop follows [Semantic Versioning](https://semver.org/):
 ## Roadmap
 
 - [x] **Phase 1**: Core scanner with 7 detectors, 5 output formats, `.vibecop.yml` config
-- [x] **Phase 2**: PR Gate GitHub Action, 15 new detectors (7 → 22), monorepo support, real-world validation
-- [ ] **Phase 3**: Cross-file analysis (duplicate code detection, repeated constants), npm publish
+- [x] **Phase 2**: PR Gate GitHub Action, 15 new detectors (7 → 22), real-world validation
+- [x] **Phase 2.5**: Agent integration (7 tools), 6 LLM/agent detectors (22 → 28), `vibecop init`, `--format agent`
+- [ ] **Phase 3**: MCP server, VS Code extension, cross-file analysis
 - [ ] **Phase 4**: LLM-powered deep review mode (separation of concerns, semantic duplication)
 
 ## Contributing

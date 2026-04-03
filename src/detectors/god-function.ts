@@ -1,5 +1,6 @@
 import type { SgNode } from "@ast-grep/napi";
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -141,6 +142,24 @@ function getJsFunctionName(node: SgNode): string {
   return "<anonymous>";
 }
 
+function buildFinding(
+  ctx: DetectionContext,
+  m: FunctionMetrics,
+  severity: "error" | "warning",
+): Finding {
+  return makeLineFinding(
+    "god-function",
+    ctx,
+    m.startLine,
+    m.startColumn,
+    `Function '${m.name}' is too complex (${m.lines} lines, cyclomatic complexity ${m.complexity}, ${m.params} params)`,
+    severity,
+    "Break this function into smaller, focused functions. Extract helper methods, use early returns, and reduce branching.",
+    m.endLine,
+    m.endColumn,
+  );
+}
+
 function detectJavaScript(ctx: DetectionContext): Finding[] {
   const findings: Finding[] = [];
   const root = ctx.root.root();
@@ -254,25 +273,6 @@ function detectPython(ctx: DetectionContext): Finding[] {
   }
 
   return findings;
-}
-
-function buildFinding(
-  ctx: DetectionContext,
-  m: FunctionMetrics,
-  severity: "error" | "warning",
-): Finding {
-  return {
-    detectorId: "god-function",
-    message: `Function '${m.name}' is too complex (${m.lines} lines, cyclomatic complexity ${m.complexity}, ${m.params} params)`,
-    severity,
-    file: ctx.file.path,
-    line: m.startLine,
-    column: m.startColumn,
-    endLine: m.endLine,
-    endColumn: m.endColumn,
-    suggestion:
-      "Break this function into smaller, focused functions. Extract helper methods, use early returns, and reduce branching.",
-  };
 }
 
 export const godFunction: Detector = {

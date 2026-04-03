@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 /**
  * Detects "god components" — React component files that do too much.
@@ -101,16 +102,15 @@ function detect(ctx: DetectionContext): Finding[] {
   if (violations.length < 2) return [];
 
   return [
-    {
-      detectorId: "god-component",
-      message: `Component file has too many hooks (${violations.join(", ")})`,
-      severity: "warning",
-      file: ctx.file.path,
-      line: 1,
-      column: 1,
-      suggestion:
-        "Split this component into smaller, focused components. Extract custom hooks for related state and effects.",
-    },
+    makeLineFinding(
+      "god-component",
+      ctx,
+      1,
+      1,
+      `Component file has too many hooks (${violations.join(", ")})`,
+      "warning",
+      "Split this component into smaller, focused components. Extract custom hooks for related state and effects.",
+    ),
   ];
 }
 

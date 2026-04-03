@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 function detectJavaScript(ctx: DetectionContext): Finding[] {
   const findings: Finding[] = [];
@@ -20,18 +21,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
     const elseText = elseBody.text().replace(/\s+/g, " ").trim();
 
     if (ifText === elseText && ifText.length > 4) {  // Skip trivial blocks like {}
-      const range = ifStmt.range();
-      findings.push({
-        detectorId: "dead-code-path",
-        message: "if and else branches are identical — condition has no effect",
-        severity: "warning",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Remove the conditional and keep only the body, or fix the branch logic",
-      });
+      findings.push(makeFinding(
+        "dead-code-path",
+        ctx,
+        ifStmt,
+        "if and else branches are identical — condition has no effect",
+        "warning",
+        "Remove the conditional and keep only the body, or fix the branch logic",
+      ));
     }
   }
 
@@ -45,18 +42,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
     let foundTerminator = false;
     for (const stmt of stmts) {
       if (foundTerminator) {
-        const range = stmt.range();
-        findings.push({
-          detectorId: "dead-code-path",
-          message: "Unreachable code after return/throw statement",
-          severity: "warning",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Remove unreachable code or fix the control flow",
-        });
+        findings.push(makeFinding(
+          "dead-code-path",
+          ctx,
+          stmt,
+          "Unreachable code after return/throw statement",
+          "warning",
+          "Remove unreachable code or fix the control flow",
+        ));
         break; // Only report once per block
       }
       if (stmt.kind() === "return_statement" || stmt.kind() === "throw_statement") {
@@ -86,18 +79,14 @@ function detectPython(ctx: DetectionContext): Finding[] {
         const elseText = elseBlock.text().replace(/\s+/g, " ").trim();
 
         if (ifText === elseText && ifText.length > 4) {
-          const range = ifStmt.range();
-          findings.push({
-            detectorId: "dead-code-path",
-            message: "if and else branches are identical — condition has no effect",
-            severity: "warning",
-            file: ctx.file.path,
-            line: range.start.line + 1,
-            column: range.start.column + 1,
-            endLine: range.end.line + 1,
-            endColumn: range.end.column + 1,
-            suggestion: "Remove the conditional and keep only the body, or fix the branch logic",
-          });
+          findings.push(makeFinding(
+            "dead-code-path",
+            ctx,
+            ifStmt,
+            "if and else branches are identical — condition has no effect",
+            "warning",
+            "Remove the conditional and keep only the body, or fix the branch logic",
+          ));
         }
       }
     }

@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -54,18 +55,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
         ch => ch.kind() === "template_substitution"
       );
       if (hasSubstitution) {
-        const range = call.range();
-        findings.push({
-          detectorId: "sql-injection",
-          message: "SQL query uses template literal with interpolation — potential SQL injection",
-          severity: "error",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Use parameterized queries instead: db.query('SELECT * FROM users WHERE id = $1', [userId])",
-        });
+        findings.push(makeFinding(
+          "sql-injection",
+          ctx,
+          call,
+          "SQL query uses template literal with interpolation — potential SQL injection",
+          "error",
+          "Use parameterized queries instead: db.query('SELECT * FROM users WHERE id = $1', [userId])",
+        ));
       }
     }
 
@@ -74,18 +71,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
       const text = firstArg.text();
       // Check if it contains SQL keywords
       if (/\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|DROP|ALTER|CREATE)\b/i.test(text)) {
-        const range = call.range();
-        findings.push({
-          detectorId: "sql-injection",
-          message: "SQL query built with string concatenation — potential SQL injection",
-          severity: "error",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Use parameterized queries instead of string concatenation",
-        });
+        findings.push(makeFinding(
+          "sql-injection",
+          ctx,
+          call,
+          "SQL query built with string concatenation — potential SQL injection",
+          "error",
+          "Use parameterized queries instead of string concatenation",
+        ));
       }
     }
   }
@@ -121,36 +114,28 @@ function detectPython(ctx: DetectionContext): Finding[] {
 
     // f-string: f"SELECT * FROM {table}"
     if (firstArg.kind() === "string" && firstArg.text().startsWith("f")) {
-      const range = call.range();
-      findings.push({
-        detectorId: "sql-injection",
-        message: "SQL query uses f-string — potential SQL injection",
-        severity: "error",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Use parameterized queries: cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))",
-      });
+      findings.push(makeFinding(
+        "sql-injection",
+        ctx,
+        call,
+        "SQL query uses f-string — potential SQL injection",
+        "error",
+        "Use parameterized queries: cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))",
+      ));
     }
 
     // .format(): "SELECT ... {}".format(table)
     if (firstArg.kind() === "call" && firstArg.text().includes(".format(")) {
       const text = firstArg.text();
       if (/\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\b/i.test(text)) {
-        const range = call.range();
-        findings.push({
-          detectorId: "sql-injection",
-          message: "SQL query uses .format() — potential SQL injection",
-          severity: "error",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Use parameterized queries instead of .format()",
-        });
+        findings.push(makeFinding(
+          "sql-injection",
+          ctx,
+          call,
+          "SQL query uses .format() — potential SQL injection",
+          "error",
+          "Use parameterized queries instead of .format()",
+        ));
       }
     }
 
@@ -160,18 +145,14 @@ function detectPython(ctx: DetectionContext): Finding[] {
       // Check parent for % operator
       const stmtText = call.text();
       if (stmtText.includes(" % ") && /\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\b/i.test(stmtText)) {
-        const range = call.range();
-        findings.push({
-          detectorId: "sql-injection",
-          message: "SQL query uses % formatting — potential SQL injection",
-          severity: "error",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Use parameterized queries: cursor.execute('SELECT ... WHERE id = %s', (value,))",
-        });
+        findings.push(makeFinding(
+          "sql-injection",
+          ctx,
+          call,
+          "SQL query uses % formatting — potential SQL injection",
+          "error",
+          "Use parameterized queries: cursor.execute('SELECT ... WHERE id = %s', (value,))",
+        ));
       }
     }
   }

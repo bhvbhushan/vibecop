@@ -20,6 +20,13 @@ export { sqlInjection } from "./sql-injection.js";
 export { dangerousInnerHtml } from "./dangerous-inner-html.js";
 export { unboundedQuery } from "./unbounded-query.js";
 export { mixedConcerns } from "./mixed-concerns.js";
+export { unsafeShellExec } from "./unsafe-shell-exec.js";
+export { llmCallNoTimeout } from "./llm-call-no-timeout.js";
+export { dynamicCodeExec } from "./dynamic-code-exec.js";
+export { llmUnpinnedModel } from "./llm-unpinned-model.js";
+export { llmNoSystemMessage } from "./llm-no-system-message.js";
+export { llmTemperatureNotSet } from "./llm-temperature-not-set.js";
+export { hallucinatedPackage } from "./hallucinated-package.js";
 
 import type { Detector } from "../types.js";
 import { emptyErrorHandler } from "./empty-error-handler.js";
@@ -44,6 +51,13 @@ import { sqlInjection } from "./sql-injection.js";
 import { dangerousInnerHtml } from "./dangerous-inner-html.js";
 import { unboundedQuery } from "./unbounded-query.js";
 import { mixedConcerns } from "./mixed-concerns.js";
+import { unsafeShellExec } from "./unsafe-shell-exec.js";
+import { llmCallNoTimeout } from "./llm-call-no-timeout.js";
+import { dynamicCodeExec } from "./dynamic-code-exec.js";
+import { llmUnpinnedModel } from "./llm-unpinned-model.js";
+import { llmNoSystemMessage } from "./llm-no-system-message.js";
+import { llmTemperatureNotSet } from "./llm-temperature-not-set.js";
+import { hallucinatedPackage } from "./hallucinated-package.js";
 
 /** All built-in detectors */
 export const builtinDetectors: Detector[] = [
@@ -69,4 +83,11 @@ export const builtinDetectors: Detector[] = [
   dangerousInnerHtml,
   unboundedQuery,
   mixedConcerns,
+  unsafeShellExec,
+  llmCallNoTimeout,
+  dynamicCodeExec,
+  llmUnpinnedModel,
+  llmNoSystemMessage,
+  llmTemperatureNotSet,
+  hallucinatedPackage,
 ];

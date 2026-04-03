@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -42,15 +43,15 @@ function detect(ctx: DetectionContext): Finding[] {
       const hasContext = CONFIG_CONTEXTS.test(line);
       if (!hasContext && description === "placeholder value") continue;
 
-      findings.push({
-        detectorId: "placeholder-in-production",
-        message: `Placeholder ${description} found: ${match[0].slice(0, 40)}`,
-        severity: "error",
-        file: ctx.file.path,
-        line: i + 1,
-        column: (match.index ?? 0) + 1,
-        suggestion: "Replace with actual configuration value or use environment variable",
-      });
+      findings.push(makeLineFinding(
+        "placeholder-in-production",
+        ctx,
+        i + 1,
+        (match.index ?? 0) + 1,
+        `Placeholder ${description} found: ${match[0].slice(0, 40)}`,
+        "error",
+        "Replace with actual configuration value or use environment variable",
+      ));
       break; // Only one finding per line
     }
   }

@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -66,18 +67,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
     // Require DB-like chain to avoid false positives on Set.delete(), Map.delete(), etc.
     if (!looksLikeDbCall(callText)) continue;
 
-    const range = stmt.range();
-    findings.push({
-      detectorId: "unchecked-db-result",
-      message: "Database mutation result is not checked — errors will be silently ignored",
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Store the result and check for errors: const result = await db.insert(...)",
-    });
+    findings.push(makeFinding(
+      "unchecked-db-result",
+      ctx,
+      stmt,
+      "Database mutation result is not checked — errors will be silently ignored",
+      "warning",
+      "Store the result and check for errors: const result = await db.insert(...)",
+    ));
   }
 
   return findings;
@@ -121,18 +118,14 @@ function detectPython(ctx: DetectionContext): Finding[] {
     }
     if (!isMutation) continue;
 
-    const range = stmt.range();
-    findings.push({
-      detectorId: "unchecked-db-result",
-      message: "Database mutation result is not checked — errors may be silently ignored",
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Store the result and verify the operation succeeded",
-    });
+    findings.push(makeFinding(
+      "unchecked-db-result",
+      ctx,
+      stmt,
+      "Database mutation result is not checked — errors may be silently ignored",
+      "warning",
+      "Store the result and verify the operation succeeded",
+    ));
   }
 
   return findings;

@@ -7,6 +7,7 @@ import type {
   DetectionContext,
   Detector,
   FileInfo,
+  Finding,
   Lang,
   ProjectInfo,
   ScanError,
@@ -303,12 +304,59 @@ export function runDetectors(
     ? { totalMs, perDetector }
     : undefined;
 
+  const dedupedFindings = dedupFindings(findings, detectors);
+
   return {
-    findings,
+    findings: dedupedFindings,
     filesScanned: filesProcessed,
     errors,
     timing,
   };
+}
+
+/**
+ * Deduplicate findings that occur on the same file:line.
+ * When multiple detectors flag the same location, keep only the
+ * finding from the detector with the highest priority.
+ */
+export function dedupFindings(
+  findings: Finding[],
+  detectors: Detector[],
+): Finding[] {
+  // Build priority map from detector metadata
+  const priorityMap = new Map<string, number>();
+  for (const d of detectors) {
+    priorityMap.set(d.id, d.meta.priority ?? 0);
+  }
+
+  // Group by file:line
+  const groups = new Map<string, Finding[]>();
+  for (const f of findings) {
+    const key = `${f.file}:${f.line}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push(f);
+    } else {
+      groups.set(key, [f]);
+    }
+  }
+
+  // Keep highest priority finding per location
+  const deduped: Finding[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      deduped.push(group[0]);
+    } else {
+      group.sort((a, b) => {
+        const pa = priorityMap.get(a.detectorId) ?? 0;
+        const pb = priorityMap.get(b.detectorId) ?? 0;
+        return pb - pa; // highest priority first
+      });
+      deduped.push(group[0]);
+    }
+  }
+
+  return deduped;
 }
 
 /**

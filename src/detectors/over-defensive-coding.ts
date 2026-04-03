@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 /**
  * Detects redundant defensive coding patterns (without type information):
@@ -121,18 +122,14 @@ function detectRedundantNullChecks(ctx: DetectionContext): Finding[] {
       ((leftCheck.checksNull && rightCheck.checksUndefined) ||
         (leftCheck.checksUndefined && rightCheck.checksNull))
     ) {
-      const range = expr.range();
-      findings.push({
-        detectorId: "over-defensive-coding",
-        message: `Redundant null+undefined check on '${leftCheck.variable}'. Use '${leftCheck.variable} != null' to check both.`,
-        severity: "info",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: `Replace with '${leftCheck.variable} != null' which checks both null and undefined`,
-      });
+      findings.push(makeFinding(
+        "over-defensive-coding",
+        ctx,
+        expr,
+        `Redundant null+undefined check on '${leftCheck.variable}'. Use '${leftCheck.variable} != null' to check both.`,
+        "info",
+        `Replace with '${leftCheck.variable} != null' which checks both null and undefined`,
+      ));
       continue;
     }
 
@@ -143,18 +140,14 @@ function detectRedundantNullChecks(ctx: DetectionContext): Finding[] {
       ((leftCheck.checksNull && rightCheck.checksUndefined) ||
         (leftCheck.checksUndefined && rightCheck.checksNull))
     ) {
-      const range = expr.range();
-      findings.push({
-        detectorId: "over-defensive-coding",
-        message: `Redundant check: '${leftCheck.variable} != null' already checks both null and undefined`,
-        severity: "info",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: `Use just '${leftCheck.variable} != null' — it checks both null and undefined`,
-      });
+      findings.push(makeFinding(
+        "over-defensive-coding",
+        ctx,
+        expr,
+        `Redundant check: '${leftCheck.variable} != null' already checks both null and undefined`,
+        "info",
+        `Use just '${leftCheck.variable} != null' — it checks both null and undefined`,
+      ));
     }
   }
 
@@ -199,18 +192,14 @@ function detectJsonParseLiteralTryCatch(ctx: DetectionContext): Finding[] {
         // Only flag string literals, not template literals or variables
         if (arg.kind() !== "string") continue;
 
-        const range = tryNode.range();
-        findings.push({
-          detectorId: "over-defensive-coding",
-          message: "Unnecessary try/catch around JSON.parse() with a string literal argument that cannot fail",
-          severity: "info",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Remove the try/catch — JSON.parse with a valid string literal will never throw",
-        });
+        findings.push(makeFinding(
+          "over-defensive-coding",
+          ctx,
+          tryNode,
+          "Unnecessary try/catch around JSON.parse() with a string literal argument that cannot fail",
+          "info",
+          "Remove the try/catch — JSON.parse with a valid string literal will never throw",
+        ));
       }
     }
   }

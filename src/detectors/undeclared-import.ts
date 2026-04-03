@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 /**
  * Detects imports that aren't declared in the project's manifest files.
@@ -267,7 +268,7 @@ const PYTHON_TEST_PACKAGES = new Set([
 /** Cache for local package directory lookups */
 const localPackageCache = new Map<string, Set<string>>();
 
-/** Cache: project root path → local package names */
+/** Cache: project root path -> local package names */
 const projectRootCache = new Map<string, string>();
 
 /**
@@ -338,7 +339,7 @@ function isPythonImportDeclared(topLevel: string, ctx: DetectionContext, scanRoo
   if (PYTHON_BUILTINS.has(topLevel)) return true;
   if (ctx.project.dependencies.has(topLevel)) return true;
 
-  // Check import-to-package mapping (e.g., PIL → Pillow)
+  // Check import-to-package mapping (e.g., PIL -> Pillow)
   const mappedName = PYTHON_IMPORT_TO_PACKAGE[topLevel];
   if (mappedName && ctx.project.dependencies.has(mappedName)) return true;
 
@@ -351,7 +352,7 @@ function isPythonImportDeclared(topLevel: string, ctx: DetectionContext, scanRoo
   const localPackages = findLocalPyPackages(ctx.file.absolutePath, scanRoot);
   if (localPackages.has(topLevel)) return true;
 
-  // Common test packages — skip in test files
+  // Common test packages -- skip in test files
   const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__)[\\/]|[\\/]test_[^/\\]+\.py$|[\\/][^/\\]+_test\.py$|[\\/]conftest\.py$)/i;
   if (PYTHON_TEST_PACKAGES.has(topLevel) && TEST_FILE_RE.test(ctx.file.path)) return true;
 
@@ -401,18 +402,14 @@ function detectJavaScriptUndeclaredImports(ctx: DetectionContext): Finding[] {
     const nearestDeps = findNearestJsDependencies(ctx.file.absolutePath, scanRoot);
     if (nearestDeps.has(packageName)) continue;
 
-    const range = importNode.range();
-    findings.push({
-      detectorId: "undeclared-import",
-      message: `Import '${packageName}' is not declared in project dependencies`,
-      severity: "error",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: `Add '${packageName}' to your package.json dependencies`,
-    });
+    findings.push(makeFinding(
+      "undeclared-import",
+      ctx,
+      importNode,
+      `Import '${packageName}' is not declared in project dependencies`,
+      "error",
+      `Add '${packageName}' to your package.json dependencies`,
+    ));
   }
 
   // 2. Find require() calls: const x = require('pkg')
@@ -449,18 +446,14 @@ function detectJavaScriptUndeclaredImports(ctx: DetectionContext): Finding[] {
     const nearestDeps = findNearestJsDependencies(ctx.file.absolutePath, scanRoot);
     if (nearestDeps.has(packageName)) continue;
 
-    const range = call.range();
-    findings.push({
-      detectorId: "undeclared-import",
-      message: `Import '${packageName}' is not declared in project dependencies`,
-      severity: "error",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: `Add '${packageName}' to your package.json dependencies`,
-    });
+    findings.push(makeFinding(
+      "undeclared-import",
+      ctx,
+      call,
+      `Import '${packageName}' is not declared in project dependencies`,
+      "error",
+      `Add '${packageName}' to your package.json dependencies`,
+    ));
   }
 
   return findings;
@@ -492,18 +485,14 @@ function detectPythonUndeclaredImports(ctx: DetectionContext): Finding[] {
     const topLevel = fullName.split(".")[0];
     if (isPythonImportDeclared(topLevel, ctx, scanRoot)) continue;
 
-    const range = importNode.range();
-    findings.push({
-      detectorId: "undeclared-import",
-      message: `Import '${topLevel}' is not declared in project dependencies`,
-      severity: "error",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: `Add '${topLevel}' to your requirements.txt or pyproject.toml`,
-    });
+    findings.push(makeFinding(
+      "undeclared-import",
+      ctx,
+      importNode,
+      `Import '${topLevel}' is not declared in project dependencies`,
+      "error",
+      `Add '${topLevel}' to your requirements.txt or pyproject.toml`,
+    ));
   }
 
   // Find import_from_statement: `from X import Y` or `from X.Y import Z`
@@ -522,18 +511,14 @@ function detectPythonUndeclaredImports(ctx: DetectionContext): Finding[] {
     const topLevel = fullName.split(".")[0];
     if (isPythonImportDeclared(topLevel, ctx, scanRoot)) continue;
 
-    const range = importNode.range();
-    findings.push({
-      detectorId: "undeclared-import",
-      message: `Import '${topLevel}' is not declared in project dependencies`,
-      severity: "error",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: `Add '${topLevel}' to your requirements.txt or pyproject.toml`,
-    });
+    findings.push(makeFinding(
+      "undeclared-import",
+      ctx,
+      importNode,
+      `Import '${topLevel}' is not declared in project dependencies`,
+      "error",
+      `Add '${topLevel}' to your requirements.txt or pyproject.toml`,
+    ));
   }
 
   return findings;
@@ -550,7 +535,7 @@ export const undeclaredImport: Detector = {
     languages: ["javascript", "typescript", "tsx", "python"],
   },
   detect(ctx: DetectionContext): Finding[] {
-    // If no manifests found, skip entirely — we can't know what's declared
+    // If no manifests found, skip entirely -- we can't know what's declared
     if (ctx.project.manifests.length === 0) {
       return [];
     }

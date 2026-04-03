@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 /**
  * Detects files where comments dominate the code.
@@ -115,16 +116,15 @@ export const excessiveCommentRatio: Detector = {
     if (ratio > threshold) {
       const pct = Math.round(ratio * 100);
       return [
-        {
-          detectorId: "excessive-comment-ratio",
-          message: `File has ${pct}% comment lines (${counts.commentLines} comments, ${counts.codeLines} code lines). Threshold: ${Math.round(threshold * 100)}%`,
-          severity: "info",
-          file: ctx.file.path,
-          line: 1,
-          column: 1,
-          suggestion:
-            "Reduce excessive comments. Good code should be self-documenting with comments reserved for explaining 'why', not 'what'.",
-        },
+        makeLineFinding(
+          "excessive-comment-ratio",
+          ctx,
+          1,
+          1,
+          `File has ${pct}% comment lines (${counts.commentLines} comments, ${counts.codeLines} code lines). Threshold: ${Math.round(threshold * 100)}%`,
+          "info",
+          "Reduce excessive comments. Good code should be self-documenting with comments reserved for explaining 'why', not 'what'.",
+        ),
       ];
     }
 

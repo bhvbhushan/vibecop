@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -26,15 +27,15 @@ function detect(ctx: DetectionContext): Finding[] {
 
     const hasSecurityImplication = SECURITY_KEYWORDS.test(line);
 
-    findings.push({
-      detectorId: "todo-in-production",
-      message: `${match[1]} comment in production code${hasSecurityImplication ? " (security-related)" : ""}`,
-      severity: hasSecurityImplication ? "warning" : "info",
-      file: ctx.file.path,
-      line: i + 1,
-      column: (match.index ?? 0) + 1,
-      suggestion: "Address the TODO or create a tracked issue and reference it in the comment",
-    });
+    findings.push(makeLineFinding(
+      "todo-in-production",
+      ctx,
+      i + 1,
+      (match.index ?? 0) + 1,
+      `${match[1]} comment in production code${hasSecurityImplication ? " (security-related)" : ""}`,
+      hasSecurityImplication ? "warning" : "info",
+      "Address the TODO or create a tracked issue and reference it in the comment",
+    ));
   }
 
   return findings;

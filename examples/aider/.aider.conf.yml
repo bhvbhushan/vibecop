@@ -1,0 +1,5 @@
+lint-cmd:
+  - "typescript: npx vibecop scan --format text"
+  - "javascript: npx vibecop scan --format text"
+  - "python: npx vibecop scan --format text"
+auto-lint: true

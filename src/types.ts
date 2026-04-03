@@ -3,6 +3,9 @@ import type { SgRoot } from "@ast-grep/napi";
 /** Supported language identifiers */
 export type Lang = "javascript" | "typescript" | "tsx" | "python";
 
+/** Finding severity levels */
+export type Severity = "error" | "warning" | "info";
+
 /** A detector finds code quality issues in parsed files */
 export interface Detector {
   id: string;
@@ -14,9 +17,10 @@ export interface Detector {
 export interface DetectorMeta {
   name: string;
   description: string;
-  severity: "error" | "warning" | "info";
+  severity: Severity;
   category: "correctness" | "quality" | "security" | "testing";
   languages: Lang[];
+  priority?: number;
 }
 
 /** Context passed to each detector for a single file */
@@ -40,7 +44,7 @@ export interface FileInfo {
 export interface Finding {
   detectorId: string;
   message: string;
-  severity: "error" | "warning" | "info";
+  severity: Severity;
   file: string;
   line: number;
   column: number;

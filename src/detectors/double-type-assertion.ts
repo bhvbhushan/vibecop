@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -22,15 +23,15 @@ function detect(ctx: DetectionContext): Finding[] {
     const match = line.match(doubleAssertRe) || line.match(doubleAssertRe2);
     if (!match) continue;
 
-    findings.push({
-      detectorId: "double-type-assertion",
-      message: "Double type assertion (as unknown as X) bypasses TypeScript's type safety",
-      severity: "warning",
-      file: ctx.file.path,
-      line: i + 1,
-      column: (match.index ?? 0) + 1,
-      suggestion: "Fix the underlying type mismatch instead of using double assertion. Add a proper type guard or fix the type definition.",
-    });
+    findings.push(makeLineFinding(
+      "double-type-assertion",
+      ctx,
+      i + 1,
+      (match.index ?? 0) + 1,
+      "Double type assertion (as unknown as X) bypasses TypeScript's type safety",
+      "warning",
+      "Fix the underlying type mismatch instead of using double assertion. Add a proper type guard or fix the type definition.",
+    ));
   }
 
   return findings;

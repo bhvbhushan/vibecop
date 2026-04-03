@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "npx vibecop scan --diff HEAD --format agent"
+      }
+    ]
+  }
+}

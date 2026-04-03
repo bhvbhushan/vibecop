@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -60,17 +61,17 @@ function detect(ctx: DetectionContext): Finding[] {
 
   // Report each instance
   for (const loc of anyLocations) {
-    findings.push({
-      detectorId: "excessive-any",
-      message: `Excessive use of 'any' type (${anyLocations.length} in this file) — weakens type safety`,
-      severity: "warning",
-      file: ctx.file.path,
-      line: loc.line,
-      column: loc.column,
-      endLine: loc.endLine,
-      endColumn: loc.endColumn,
-      suggestion: "Replace with a specific type, unknown, or a generic type parameter",
-    });
+    findings.push(makeLineFinding(
+      "excessive-any",
+      ctx,
+      loc.line,
+      loc.column,
+      `Excessive use of 'any' type (${anyLocations.length} in this file) — weakens type safety`,
+      "warning",
+      "Replace with a specific type, unknown, or a generic type parameter",
+      loc.endLine,
+      loc.endColumn,
+    ));
   }
 
   return findings;

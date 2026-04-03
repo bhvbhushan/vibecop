@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 /**
  * Detects database or API calls inside loops that may cause N+1 query
@@ -96,18 +97,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
 
     if (!isDbCall) continue;
 
-    const range = awaitExpr.range();
-    findings.push({
-      detectorId: "n-plus-one-query",
-      message: "Database or API call inside a loop — potential N+1 query",
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Batch the operation outside the loop (e.g., use WHERE IN, Promise.all, or bulk API endpoint)",
-    });
+    findings.push(makeFinding(
+      "n-plus-one-query",
+      ctx,
+      awaitExpr,
+      "Database or API call inside a loop — potential N+1 query",
+      "warning",
+      "Batch the operation outside the loop (e.g., use WHERE IN, Promise.all, or bulk API endpoint)",
+    ));
   }
 
   // Check for .map(async () => await db...) pattern — common N+1 disguised as batching
@@ -144,18 +141,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
       }
       if (!isDbCall) continue;
 
-      const range = innerAwait.range();
-      findings.push({
-        detectorId: "n-plus-one-query",
-        message: "Database or API call inside .map(async ...) — potential N+1 query",
-        severity: "warning",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Batch the operation (e.g., use WHERE IN or a single bulk query) instead of per-item async calls",
-      });
+      findings.push(makeFinding(
+        "n-plus-one-query",
+        ctx,
+        innerAwait,
+        "Database or API call inside .map(async ...) — potential N+1 query",
+        "warning",
+        "Batch the operation (e.g., use WHERE IN or a single bulk query) instead of per-item async calls",
+      ));
     }
   }
 
@@ -191,18 +184,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
 
     if (!isDbCall) continue;
 
-    const range = call.range();
-    findings.push({
-      detectorId: "n-plus-one-query",
-      message: "Database or API call inside a loop — potential N+1 query",
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Batch the operation outside the loop (e.g., use WHERE IN, Promise.all, or bulk API endpoint)",
-    });
+    findings.push(makeFinding(
+      "n-plus-one-query",
+      ctx,
+      call,
+      "Database or API call inside a loop — potential N+1 query",
+      "warning",
+      "Batch the operation outside the loop (e.g., use WHERE IN, Promise.all, or bulk API endpoint)",
+    ));
   }
 
   return findings;
@@ -231,17 +220,14 @@ function detectPython(ctx: DetectionContext): Finding[] {
 
     const range = awaitExpr.range();
     reported.add(range.start.line);
-    findings.push({
-      detectorId: "n-plus-one-query",
-      message: "Database call inside a loop — potential N+1 query",
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Batch the operation outside the loop (e.g., use WHERE IN or bulk query)",
-    });
+    findings.push(makeFinding(
+      "n-plus-one-query",
+      ctx,
+      awaitExpr,
+      "Database call inside a loop — potential N+1 query",
+      "warning",
+      "Batch the operation outside the loop (e.g., use WHERE IN or bulk query)",
+    ));
   }
 
   // Check regular calls inside loops (sync Python: `cursor.execute(...)`)
@@ -257,17 +243,14 @@ function detectPython(ctx: DetectionContext): Finding[] {
     const callText = call.text();
     if (!isDbCallPython(callText)) continue;
 
-    findings.push({
-      detectorId: "n-plus-one-query",
-      message: "Database call inside a loop — potential N+1 query",
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Batch the operation outside the loop (e.g., use WHERE IN or bulk query)",
-    });
+    findings.push(makeFinding(
+      "n-plus-one-query",
+      ctx,
+      call,
+      "Database call inside a loop — potential N+1 query",
+      "warning",
+      "Batch the operation outside the loop (e.g., use WHERE IN or bulk query)",
+    ));
   }
 
   return findings;

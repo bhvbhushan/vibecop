@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__|scripts)[\\/]|\.(?:test|spec|e2e)\.[^.]+$|[\\/]test_[^/\\]+\.py$|[\\/][^/\\]+_test\.py$)/i;
 
@@ -27,18 +28,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
     const method = property.text();
     if (!DEBUG_METHODS.has(method)) continue;
 
-    const range = call.range();
-    findings.push({
-      detectorId: "debug-console-in-prod",
-      message: `console.${method}() left in production code`,
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Remove debug logging or replace with a structured logger",
-    });
+    findings.push(makeFinding(
+      "debug-console-in-prod",
+      ctx,
+      call,
+      `console.${method}() left in production code`,
+      "warning",
+      "Remove debug logging or replace with a structured logger",
+    ));
   }
 
   return findings;
@@ -55,18 +52,14 @@ function detectPython(ctx: DetectionContext): Finding[] {
     const callText = call.text();
     if (!callText.startsWith("print(")) continue;
 
-    const range = call.range();
-    findings.push({
-      detectorId: "debug-console-in-prod",
-      message: "print() left in production code",
-      severity: "info",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Remove debug print or replace with logging module",
-    });
+    findings.push(makeFinding(
+      "debug-console-in-prod",
+      ctx,
+      call,
+      "print() left in production code",
+      "info",
+      "Remove debug print or replace with logging module",
+    ));
   }
 
   return findings;

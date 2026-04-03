@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { discoverFiles, runDetectors } from "../src/engine.js";
+import { dedupFindings, discoverFiles, runDetectors } from "../src/engine.js";
 import type {
   VibeCopConfig,
   Detector,
@@ -273,5 +273,194 @@ describe("runDetectors", () => {
     const result = runDetectors(tsFiles, [detector], EMPTY_PROJECT, config);
 
     expect(result.findings.length).toBe(0);
+  });
+});
+
+describe("dedupFindings", () => {
+  test("keeps higher-priority finding when two detectors flag same line", () => {
+    const findings: Finding[] = [
+      {
+        detectorId: "low-priority",
+        message: "Low priority finding",
+        severity: "info",
+        file: "src/app.ts",
+        line: 10,
+        column: 1,
+      },
+      {
+        detectorId: "high-priority",
+        message: "High priority finding",
+        severity: "error",
+        file: "src/app.ts",
+        line: 10,
+        column: 5,
+      },
+    ];
+
+    const detectors: Detector[] = [
+      {
+        id: "low-priority",
+        meta: {
+          name: "Low",
+          description: "Low priority detector",
+          severity: "info",
+          category: "quality",
+          languages: ["typescript"],
+          priority: 1,
+        },
+        detect: () => [],
+      },
+      {
+        id: "high-priority",
+        meta: {
+          name: "High",
+          description: "High priority detector",
+          severity: "error",
+          category: "security",
+          languages: ["typescript"],
+          priority: 10,
+        },
+        detect: () => [],
+      },
+    ];
+
+    const result = dedupFindings(findings, detectors);
+    expect(result.length).toBe(1);
+    expect(result[0].detectorId).toBe("high-priority");
+  });
+
+  test("keeps both findings when they are on different lines", () => {
+    const findings: Finding[] = [
+      {
+        detectorId: "detector-a",
+        message: "Finding A",
+        severity: "warning",
+        file: "src/app.ts",
+        line: 10,
+        column: 1,
+      },
+      {
+        detectorId: "detector-b",
+        message: "Finding B",
+        severity: "warning",
+        file: "src/app.ts",
+        line: 20,
+        column: 1,
+      },
+    ];
+
+    const detectors: Detector[] = [
+      {
+        id: "detector-a",
+        meta: {
+          name: "A",
+          description: "Detector A",
+          severity: "warning",
+          category: "quality",
+          languages: ["typescript"],
+          priority: 5,
+        },
+        detect: () => [],
+      },
+      {
+        id: "detector-b",
+        meta: {
+          name: "B",
+          description: "Detector B",
+          severity: "warning",
+          category: "quality",
+          languages: ["typescript"],
+          priority: 5,
+        },
+        detect: () => [],
+      },
+    ];
+
+    const result = dedupFindings(findings, detectors);
+    expect(result.length).toBe(2);
+  });
+
+  test("keeps the only finding when there is no overlap", () => {
+    const findings: Finding[] = [
+      {
+        detectorId: "solo-detector",
+        message: "Solo finding",
+        severity: "error",
+        file: "src/app.ts",
+        line: 5,
+        column: 1,
+      },
+    ];
+
+    const detectors: Detector[] = [
+      {
+        id: "solo-detector",
+        meta: {
+          name: "Solo",
+          description: "Solo detector",
+          severity: "error",
+          category: "security",
+          languages: ["typescript"],
+          priority: 10,
+        },
+        detect: () => [],
+      },
+    ];
+
+    const result = dedupFindings(findings, detectors);
+    expect(result.length).toBe(1);
+    expect(result[0].detectorId).toBe("solo-detector");
+  });
+
+  test("treats undefined priority as 0", () => {
+    const findings: Finding[] = [
+      {
+        detectorId: "no-priority",
+        message: "No priority",
+        severity: "info",
+        file: "src/app.ts",
+        line: 10,
+        column: 1,
+      },
+      {
+        detectorId: "has-priority",
+        message: "Has priority",
+        severity: "warning",
+        file: "src/app.ts",
+        line: 10,
+        column: 5,
+      },
+    ];
+
+    const detectors: Detector[] = [
+      {
+        id: "no-priority",
+        meta: {
+          name: "NoPriority",
+          description: "No priority set",
+          severity: "info",
+          category: "quality",
+          languages: ["typescript"],
+          // priority intentionally omitted — should default to 0
+        },
+        detect: () => [],
+      },
+      {
+        id: "has-priority",
+        meta: {
+          name: "HasPriority",
+          description: "Priority is 5",
+          severity: "warning",
+          category: "quality",
+          languages: ["typescript"],
+          priority: 5,
+        },
+        detect: () => [],
+      },
+    ];
+
+    const result = dedupFindings(findings, detectors);
+    expect(result.length).toBe(1);
+    expect(result[0].detectorId).toBe("has-priority");
   });
 });

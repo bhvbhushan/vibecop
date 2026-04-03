@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -19,18 +20,14 @@ function detect(ctx: DetectionContext): Finding[] {
     if (!name) continue;
     if (name.text() !== "dangerouslySetInnerHTML") continue;
 
-    const range = attr.range();
-    findings.push({
-      detectorId: "dangerous-inner-html",
-      message: "dangerouslySetInnerHTML can lead to XSS attacks if the content is not sanitized",
-      severity: "warning",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Use a sanitization library like DOMPurify: dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(content)}}",
-    });
+    findings.push(makeFinding(
+      "dangerous-inner-html",
+      ctx,
+      attr,
+      "dangerouslySetInnerHTML can lead to XSS attacks if the content is not sanitized",
+      "warning",
+      "Use a sanitization library like DOMPurify: dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(content)}}",
+    ));
   }
 
   return findings;

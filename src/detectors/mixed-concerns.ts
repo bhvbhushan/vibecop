@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -65,27 +66,27 @@ function detect(ctx: DetectionContext): Finding[] {
   }
 
   if (hasUIImport && hasDBImport) {
-    findings.push({
-      detectorId: "mixed-concerns",
-      message: `File imports both UI framework (${uiImportName}) and database (${dbImportName}) — mixed concerns`,
-      severity: "warning",
-      file: ctx.file.path,
-      line: 1,
-      column: 1,
-      suggestion: "Separate UI rendering from data access. Move database logic to a service/API layer.",
-    });
+    findings.push(makeLineFinding(
+      "mixed-concerns",
+      ctx,
+      1,
+      1,
+      `File imports both UI framework (${uiImportName}) and database (${dbImportName}) — mixed concerns`,
+      "warning",
+      "Separate UI rendering from data access. Move database logic to a service/API layer.",
+    ));
   }
 
   if (hasUIImport && hasServerImport) {
-    findings.push({
-      detectorId: "mixed-concerns",
-      message: `File imports both UI framework (${uiImportName}) and server framework — mixed concerns`,
-      severity: "warning",
-      file: ctx.file.path,
-      line: 1,
-      column: 1,
-      suggestion: "Separate UI components from server-side logic.",
-    });
+    findings.push(makeLineFinding(
+      "mixed-concerns",
+      ctx,
+      1,
+      1,
+      `File imports both UI framework (${uiImportName}) and server framework — mixed concerns`,
+      "warning",
+      "Separate UI components from server-side logic.",
+    ));
   }
 
   return findings;

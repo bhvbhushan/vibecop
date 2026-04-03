@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 /**
  * Detects insecure default patterns:
@@ -71,18 +72,14 @@ function detectRejectUnauthorized(
     const value = children.find((ch) => ch.kind() === "false");
 
     if (key && value && key.text().replace(/["']/g, "") === "rejectUnauthorized") {
-      const range = pair.range();
-      findings.push({
-        detectorId: "insecure-defaults",
-        message: "TLS certificate verification is disabled (rejectUnauthorized: false)",
-        severity: "error",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Remove rejectUnauthorized: false to enable TLS certificate verification",
-      });
+      findings.push(makeFinding(
+        "insecure-defaults",
+        ctx,
+        pair,
+        "TLS certificate verification is disabled (rejectUnauthorized: false)",
+        "error",
+        "Remove rejectUnauthorized: false to enable TLS certificate verification",
+      ));
     }
   }
 }
@@ -97,18 +94,14 @@ function detectEvalUsage(
     const children = call.children();
     const fn = children[0];
     if (fn && fn.kind() === "identifier" && fn.text() === "eval") {
-      const range = call.range();
-      findings.push({
-        detectorId: "insecure-defaults",
-        message: "eval() executes arbitrary code and is a security risk",
-        severity: "error",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Avoid eval(). Use JSON.parse() for data, or refactor to avoid dynamic code execution",
-      });
+      findings.push(makeFinding(
+        "insecure-defaults",
+        ctx,
+        call,
+        "eval() executes arbitrary code and is a security risk",
+        "error",
+        "Avoid eval(). Use JSON.parse() for data, or refactor to avoid dynamic code execution",
+      ));
     }
   }
 }
@@ -123,18 +116,14 @@ function detectNewFunction(
     const children = newExpr.children();
     const constructorNode = children.find((ch) => ch.kind() === "identifier");
     if (constructorNode && constructorNode.text() === "Function") {
-      const range = newExpr.range();
-      findings.push({
-        detectorId: "insecure-defaults",
-        message: "new Function() creates functions from strings and is a security risk",
-        severity: "error",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Avoid new Function(). Refactor to use static function definitions",
-      });
+      findings.push(makeFinding(
+        "insecure-defaults",
+        ctx,
+        newExpr,
+        "new Function() creates functions from strings and is a security risk",
+        "error",
+        "Avoid new Function(). Refactor to use static function definitions",
+      ));
     }
   }
 }
@@ -175,18 +164,14 @@ function detectHardcodedCredentialsJS(
     if (strContent.length === 0) continue;
     if (looksLikeNonCredential(strContent)) continue;
 
-    const range = pair.range();
-    findings.push({
-      detectorId: "insecure-defaults",
-      message: `Hardcoded credential detected in property '${keyName}'`,
-      severity: "error",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Use environment variables or a secrets manager instead of hardcoding credentials",
-    });
+    findings.push(makeFinding(
+      "insecure-defaults",
+      ctx,
+      pair,
+      `Hardcoded credential detected in property '${keyName}'`,
+      "error",
+      "Use environment variables or a secrets manager instead of hardcoding credentials",
+    ));
   }
 }
 
@@ -209,18 +194,14 @@ function checkCredentialAssignment(
   if (strContent.length === 0) return;
   if (looksLikeNonCredential(strContent)) return;
 
-  const range = node.range();
-  findings.push({
-    detectorId: "insecure-defaults",
-    message: `Hardcoded credential detected in variable '${varName}'`,
-    severity: "error",
-    file: ctx.file.path,
-    line: range.start.line + 1,
-    column: range.start.column + 1,
-    endLine: range.end.line + 1,
-    endColumn: range.end.column + 1,
-    suggestion: "Use environment variables or a secrets manager instead of hardcoding credentials",
-  });
+  findings.push(makeFinding(
+    "insecure-defaults",
+    ctx,
+    node,
+    `Hardcoded credential detected in variable '${varName}'`,
+    "error",
+    "Use environment variables or a secrets manager instead of hardcoding credentials",
+  ));
 }
 
 function detectWeakCiphers(
@@ -250,18 +231,14 @@ function detectWeakCiphers(
     if (firstArg.kind() === "string") {
       const cipher = firstArg.text().slice(1, -1).toLowerCase();
       if (WEAK_CIPHERS.has(cipher)) {
-        const range = call.range();
-        findings.push({
-          detectorId: "insecure-defaults",
-          message: `Weak cipher algorithm '${cipher}' detected`,
-          severity: "error",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion: "Use a strong cipher algorithm like 'aes-256-gcm' instead",
-        });
+        findings.push(makeFinding(
+          "insecure-defaults",
+          ctx,
+          call,
+          `Weak cipher algorithm '${cipher}' detected`,
+          "error",
+          "Use a strong cipher algorithm like 'aes-256-gcm' instead",
+        ));
       }
     }
   }
@@ -300,18 +277,14 @@ function detectPythonVerifyFalse(
     const value = children.find((ch) => ch.kind() === "false");
 
     if (key && value && key.text() === "verify") {
-      const range = kwarg.range();
-      findings.push({
-        detectorId: "insecure-defaults",
-        message: "TLS certificate verification is disabled (verify=False)",
-        severity: "error",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Remove verify=False to enable TLS certificate verification",
-      });
+      findings.push(makeFinding(
+        "insecure-defaults",
+        ctx,
+        kwarg,
+        "TLS certificate verification is disabled (verify=False)",
+        "error",
+        "Remove verify=False to enable TLS certificate verification",
+      ));
     }
   }
 }
@@ -328,18 +301,14 @@ function detectPythonShellTrue(
     const value = children.find((ch) => ch.kind() === "true");
 
     if (key && value && key.text() === "shell") {
-      const range = kwarg.range();
-      findings.push({
-        detectorId: "insecure-defaults",
-        message: "shell=True in subprocess call allows shell injection attacks",
-        severity: "error",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Use shell=False (the default) and pass arguments as a list",
-      });
+      findings.push(makeFinding(
+        "insecure-defaults",
+        ctx,
+        kwarg,
+        "shell=True in subprocess call allows shell injection attacks",
+        "error",
+        "Use shell=False (the default) and pass arguments as a list",
+      ));
     }
   }
 }
@@ -354,18 +323,14 @@ function detectPythonEval(
     const children = call.children();
     const fn = children[0];
     if (fn && fn.kind() === "identifier" && fn.text() === "eval") {
-      const range = call.range();
-      findings.push({
-        detectorId: "insecure-defaults",
-        message: "eval() executes arbitrary code and is a security risk",
-        severity: "error",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion: "Avoid eval(). Use ast.literal_eval() for safe expression evaluation",
-      });
+      findings.push(makeFinding(
+        "insecure-defaults",
+        ctx,
+        call,
+        "eval() executes arbitrary code and is a security risk",
+        "error",
+        "Avoid eval(). Use ast.literal_eval() for safe expression evaluation",
+      ));
     }
   }
 }
@@ -399,18 +364,14 @@ function detectPythonHardcodedCredentials(
 
     if (strContent.length === 0) continue;
 
-    const range = assign.range();
-    findings.push({
-      detectorId: "insecure-defaults",
-      message: `Hardcoded credential detected in variable '${varName}'`,
-      severity: "error",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Use environment variables or a secrets manager instead of hardcoding credentials",
-    });
+    findings.push(makeFinding(
+      "insecure-defaults",
+      ctx,
+      assign,
+      `Hardcoded credential detected in variable '${varName}'`,
+      "error",
+      "Use environment variables or a secrets manager instead of hardcoding credentials",
+    ));
   }
 }
 

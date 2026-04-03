@@ -234,7 +234,7 @@ function main(): void {
     .argument("[path]", "Directory to scan", ".")
     .option(
       "-f, --format <format>",
-      "Output format (text, json, github, sarif, html)",
+      "Output format (text, json, github, sarif, html, agent)",
       "text",
     )
     .option("-c, --config <path>", "Path to config file")
@@ -256,7 +256,7 @@ function main(): void {
     .argument("<file>", "File to check")
     .option(
       "-f, --format <format>",
-      "Output format (text, json, github, sarif, html)",
+      "Output format (text, json, github, sarif, html, agent)",
       "text",
     )
     .option(
@@ -267,6 +267,14 @@ function main(): void {
     .option("--verbose", "Show timing information", false)
     .option("--group-by <mode>", "Group findings by 'file' or 'rule'", "file")
     .action(checkAction);
+
+  program
+    .command("init")
+    .description("Set up vibecop integration with AI coding tools")
+    .action(async () => {
+      const { runInit } = await import("./init.js");
+      await runInit();
+    });
 
   program.parse();
 }

@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeLineFinding } from "./utils.js";
 
 /**
  * Detects test files where mocking dominates over assertions.
@@ -95,16 +96,15 @@ function detectJsMocking(ctx: DetectionContext): Finding[] {
 
   if (mockCount > 0 && mockCount > assertionCount * ratio) {
     return [
-      {
-        detectorId: "over-mocking",
-        message: `Test file has more mocks (${mockCount}) than assertions (${assertionCount}). Tests that over-mock may not verify real behavior.`,
-        severity: "warning",
-        file: ctx.file.path,
-        line: 1,
-        column: 1,
-        suggestion:
-          "Reduce mocking and add more assertions. Consider integration tests for heavily-mocked code.",
-      },
+      makeLineFinding(
+        "over-mocking",
+        ctx,
+        1,
+        1,
+        `Test file has more mocks (${mockCount}) than assertions (${assertionCount}). Tests that over-mock may not verify real behavior.`,
+        "warning",
+        "Reduce mocking and add more assertions. Consider integration tests for heavily-mocked code.",
+      ),
     ];
   }
 
@@ -119,16 +119,15 @@ function detectPythonMocking(ctx: DetectionContext): Finding[] {
 
   if (mockCount > 0 && mockCount > assertionCount * ratio) {
     return [
-      {
-        detectorId: "over-mocking",
-        message: `Test file has more mocks (${mockCount}) than assertions (${assertionCount}). Tests that over-mock may not verify real behavior.`,
-        severity: "warning",
-        file: ctx.file.path,
-        line: 1,
-        column: 1,
-        suggestion:
-          "Reduce mocking and add more assertions. Consider integration tests for heavily-mocked code.",
-      },
+      makeLineFinding(
+        "over-mocking",
+        ctx,
+        1,
+        1,
+        `Test file has more mocks (${mockCount}) than assertions (${assertionCount}). Tests that over-mock may not verify real behavior.`,
+        "warning",
+        "Reduce mocking and add more assertions. Consider integration tests for heavily-mocked code.",
+      ),
     ];
   }
 

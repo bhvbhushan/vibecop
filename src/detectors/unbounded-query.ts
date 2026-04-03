@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
 
@@ -114,18 +115,14 @@ function detectJavaScript(ctx: DetectionContext): Finding[] {
     }
     if (chainHasLimit) continue;
 
-    const range = call.range();
-    findings.push({
-      detectorId: "unbounded-query",
-      message: "Query fetches multiple records without a limit — may return excessive data",
-      severity: "info",
-      file: ctx.file.path,
-      line: range.start.line + 1,
-      column: range.start.column + 1,
-      endLine: range.end.line + 1,
-      endColumn: range.end.column + 1,
-      suggestion: "Add a limit: findMany({ take: 100 }) or .limit(100)",
-    });
+    findings.push(makeFinding(
+      "unbounded-query",
+      ctx,
+      call,
+      "Query fetches multiple records without a limit — may return excessive data",
+      "info",
+      "Add a limit: findMany({ take: 100 }) or .limit(100)",
+    ));
   }
 
   return findings;

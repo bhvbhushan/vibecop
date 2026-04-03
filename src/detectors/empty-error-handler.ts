@@ -1,4 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
+import { makeFinding } from "./utils.js";
 
 /**
  * Detects catch/except blocks that do nothing useful:
@@ -50,22 +51,16 @@ function detectJavaScriptCatchBlocks(ctx: DetectionContext): Finding[] {
     const hasComment = body.children().some((ch) => ch.kind() === "comment");
     if (hasComment) continue;
 
-    const range = catchNode.range();
-
     if (bodyChildren.length === 0) {
       // Completely empty catch block
-      findings.push({
-        detectorId: "empty-error-handler",
-        message: "Empty catch block silently swallows errors",
-        severity: "warning",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion:
-          "Add error handling, re-throw the error, or add a comment explaining why the error is intentionally ignored",
-      });
+      findings.push(makeFinding(
+        "empty-error-handler",
+        ctx,
+        catchNode,
+        "Empty catch block silently swallows errors",
+        "warning",
+        "Add error handling, re-throw the error, or add a comment explaining why the error is intentionally ignored",
+      ));
       continue;
     }
 
@@ -75,19 +70,14 @@ function detectJavaScriptCatchBlocks(ctx: DetectionContext): Finding[] {
       if (stmt.kind() === "expression_statement") {
         const stmtText = stmt.text().replace(/;$/, "").trim();
         if (isLogOnlyCall(stmtText)) {
-          findings.push({
-            detectorId: "empty-error-handler",
-            message:
-              "Catch block only logs the error without handling it",
-            severity: "warning",
-            file: ctx.file.path,
-            line: range.start.line + 1,
-            column: range.start.column + 1,
-            endLine: range.end.line + 1,
-            endColumn: range.end.column + 1,
-            suggestion:
-              "Add proper error handling: re-throw, return a fallback value, or propagate the error",
-          });
+          findings.push(makeFinding(
+            "empty-error-handler",
+            ctx,
+            catchNode,
+            "Catch block only logs the error without handling it",
+            "warning",
+            "Add proper error handling: re-throw, return a fallback value, or propagate the error",
+          ));
         }
       }
     }
@@ -108,7 +98,6 @@ function detectPythonExceptBlocks(ctx: DetectionContext): Finding[] {
     if (!block) continue;
 
     const blockChildren = block.children();
-    const range = exceptNode.range();
 
     // Check for comment in the source text between except line and block content
     // Since Python comments don't appear as AST nodes inside blocks reliably,
@@ -117,18 +106,14 @@ function detectPythonExceptBlocks(ctx: DetectionContext): Finding[] {
     if (exceptText.includes("#")) continue;
 
     if (blockChildren.length === 1 && blockChildren[0].kind() === "pass_statement") {
-      findings.push({
-        detectorId: "empty-error-handler",
-        message: "Except block with only 'pass' silently swallows errors",
-        severity: "warning",
-        file: ctx.file.path,
-        line: range.start.line + 1,
-        column: range.start.column + 1,
-        endLine: range.end.line + 1,
-        endColumn: range.end.column + 1,
-        suggestion:
-          "Add error handling, re-raise the exception, or add a comment explaining why the error is intentionally ignored",
-      });
+      findings.push(makeFinding(
+        "empty-error-handler",
+        ctx,
+        exceptNode,
+        "Except block with only 'pass' silently swallows errors",
+        "warning",
+        "Add error handling, re-raise the exception, or add a comment explaining why the error is intentionally ignored",
+      ));
       continue;
     }
 
@@ -136,18 +121,14 @@ function detectPythonExceptBlocks(ctx: DetectionContext): Finding[] {
     if (blockChildren.length === 1 && blockChildren[0].kind() === "expression_statement") {
       const stmtText = blockChildren[0].text().trim();
       if (isPythonLogOnlyCall(stmtText)) {
-        findings.push({
-          detectorId: "empty-error-handler",
-          message: "Except block only logs the error without handling it",
-          severity: "warning",
-          file: ctx.file.path,
-          line: range.start.line + 1,
-          column: range.start.column + 1,
-          endLine: range.end.line + 1,
-          endColumn: range.end.column + 1,
-          suggestion:
-            "Add proper error handling: re-raise, return a fallback value, or propagate the error",
-        });
+        findings.push(makeFinding(
+          "empty-error-handler",
+          ctx,
+          exceptNode,
+          "Except block only logs the error without handling it",
+          "warning",
+          "Add proper error handling: re-raise, return a fallback value, or propagate the error",
+        ));
       }
     }
   }
