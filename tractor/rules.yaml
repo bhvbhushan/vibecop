@@ -1,9 +1,9 @@
 # VibeCop rules expressed as Tractor XPath queries
 #
 # Usage:
-#   tractor check "src/**/*.ts" --rules poc/tractor-rules.yaml -f gcc
-#   tractor check "src/**/*.ts" --rules poc/tractor-rules.yaml -f json -v "reason,severity,file,line,column,rule_id"
-#   tractor check "src/**/*.ts" --rules poc/tractor-rules.yaml -f github
+#   tractor check "src/**/*.ts" --rules tractor/rules.yaml -f gcc
+#   tractor check "src/**/*.ts" --rules tractor/rules.yaml -f json -v "reason,severity,file,line,column,rule_id"
+#   tractor check "src/**/*.ts" --rules tractor/rules.yaml -f github
 #
 # This file replaces ~1,500 lines of hand-coded TypeScript AST detectors
 # with ~200 lines of declarative XPath rules.

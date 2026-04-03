@@ -6,9 +6,9 @@
  * VibeCop's 22 hand-coded AST detectors with declarative XPath rules.
  *
  * Usage:
- *   bun poc/tractor-backend.ts [scan-path]
- *   bun poc/tractor-backend.ts "src/**/*.ts" --format json
- *   bun poc/tractor-backend.ts "src/**/*.ts" --format gcc
+ *   bun tractor/backend.ts [scan-path]
+ *   bun tractor/backend.ts "src/**/*.ts" --format json
+ *   bun tractor/backend.ts "src/**/*.ts" --format gcc
  */
 
 import { execSync, type ExecSyncOptionsWithStringEncoding } from "node:child_process";
@@ -77,13 +77,13 @@ const SUGGESTIONS: Record<string, string> = {
 
 function findRulesFile(): string {
   const candidates = [
-    resolve("poc/tractor-rules.yaml"),
-    join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")), "tractor-rules.yaml"),
+    resolve("tractor/rules.yaml"),
+    join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")), "rules.yaml"),
   ];
   for (const path of candidates) {
     if (existsSync(path)) return path;
   }
-  throw new Error("Cannot find poc/tractor-rules.yaml. Run from the vibecop project root.");
+  throw new Error("Cannot find tractor/rules.yaml. Run from the vibecop project root.");
 }
 
 function runTractor(fileGlob: string): TractorReport {
