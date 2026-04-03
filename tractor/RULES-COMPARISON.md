@@ -23,60 +23,37 @@ replaces both the detector code AND the test code.**
 
 ## Rule-by-Rule Comparison
 
-### Ported to Tractor
+### All VibeCop Rules
 
-| # | VibeCop Rule | Category | Detector | Tests | **Total** | Tractor | Status |
-|---|-------------|----------|----------|-------|-----------|---------|--------|
-| 1 | `debug-console-in-prod` | quality | 88 | 157 | **245** | 13 lines | FULL |
-| 2 | `double-type-assertion` | quality | 49 | 129 | **178** | 8 lines | FULL |
-| 3 | `empty-error-handler` | quality | 174 | 209 | **383** | 18 lines | FULL |
-| 4 | `todo-in-production` | quality | 53 | 200 | **253** | 10 lines | FULL |
-| 5 | `god-function` (params+lines) | quality | 294 | 196 | **490** | 21 lines | FULL* |
-| 6 | `sql-injection` | security | 195 | 132 | **327** | 18 lines | FULL |
-| 7 | `insecure-defaults` (eval+TLS) | security | 434 | 266 | **699** | 14 lines | PARTIAL |
-| 8 | `token-in-localstorage` | security | 66 | 131 | **197** | 15 lines | FULL |
-| 9 | `n-plus-one-query` | correctness | 291 | 175 | **466** | 15 lines | PARTIAL |
-| 10 | `dead-code-path` | quality | 122 | 177 | **299** | 5 lines | FULL |
-| 11 | `trivial-assertion` | testing | 261 | 242 | **503** | 8 lines | FULL |
-| | **Ported total** | | **2,027** | **2,014** | **4,040** | **~145** | |
+| # | VibeCop Rule | Category | Det. | Tests | **Total** | Tractor | Status |
+|---|-------------|----------|------|-------|-----------|---------|--------|
+| 1 | `debug-console-in-prod` | quality | 88 | 157 | **245** | 13 lines | Ported |
+| 2 | `double-type-assertion` | quality | 49 | 129 | **178** | 8 lines | Ported |
+| 3 | `empty-error-handler` | quality | 174 | 209 | **383** | 18 lines | Ported |
+| 4 | `todo-in-production` | quality | 53 | 200 | **253** | 10 lines | Ported |
+| 5 | `god-function` | quality | 294 | 196 | **490** | 21 lines | Ported* |
+| 6 | `god-component` | quality | 128 | 196 | **324** | — | Blocked: TSX parsing ([#67](https://github.com/boukeversteegh/tractor/issues/67)) |
+| 7 | `n-plus-one-query` | correctness | 291 | 175 | **466** | 15 lines | Ported |
+| 8 | `unbounded-query` | quality | 146 | 91 | **237** | — | Needs: negative check on chained calls |
+| 9 | `dead-code-path` | quality | 122 | 177 | **299** | 5 lines | Ported |
+| 10 | `excessive-any` | quality | 89 | 163 | **252** | — | Needs: file-level counting (may work) |
+| 11 | `excessive-comment-ratio` | quality | 133 | 186 | **319** | — | Needs: comment-to-code ratio heuristic |
+| 12 | `over-defensive-coding` | quality | 241 | 152 | **393** | — | Needs: complex pair-check patterns |
+| 13 | `sql-injection` | security | 195 | 132 | **327** | 18 lines | Ported |
+| 14 | `dangerous-inner-html` | security | 49 | 85 | **134** | — | Blocked: TSX parsing ([#67](https://github.com/boukeversteegh/tractor/issues/67)) |
+| 15 | `token-in-localstorage` | security | 66 | 131 | **197** | 15 lines | Ported |
+| 16 | `insecure-defaults` | security | 434 | 266 | **699** | 14 lines | Partial (eval+TLS) |
+| 17 | `placeholder-in-production` | security | 71 | 135 | **206** | — | Doable: many `contains()` patterns |
+| 18 | `unchecked-db-result` | correctness | 154 | 157 | **311** | — | Needs: parent context / ancestor axis |
+| 19 | `mixed-concerns` | correctness | 104 | 129 | **233** | — | Beyond AST: file-level import analysis |
+| 20 | `undeclared-import` | correctness | 563 | 284 | **847** | — | Beyond AST: needs package.json |
+| 21 | `trivial-assertion` | testing | 261 | 242 | **503** | 8 lines | Ported |
+| 22 | `over-mocking` | testing | 159 | 212 | **371** | — | Beyond AST: mock vs assertion counting |
+| | **Totals** | | **3,864** | **3,804** | **7,668** | **302** | **11 of 22 ported** |
 
-\* Requires `--meta` flag. Line count uses `substring-before(@end,':')` — verbose but functional.
+\* Requires `--meta` flag for line-count detection via `substring-before(@end, ':')`.
 
-**That's a 13x reduction** — from 4,040 lines of TypeScript (detectors + tests)
-to 302 lines of YAML (rules + inline validation examples + comments).
-
-And the YAML is self-documenting: each rule's `expect`
-entries serve as both documentation and automated tests.
-
-### Not Yet Ported
-
-| # | VibeCop Rule | Category | Det. | Tests | Total | Blocker |
-|---|-------------|----------|------|-------|-------|---------|
-| 12 | `god-component` | quality | 128 | 196 | 324 | TSX/JSX parsing broken ([tractor#67](https://github.com/boukeversteegh/tractor/issues/67)) |
-| 13 | `unbounded-query` | quality | 146 | 91 | 237 | Negative check on chained calls |
-| 14 | `excessive-any` | quality | 89 | 163 | 252 | File-level counting (may already work) |
-| 15 | `excessive-comment-ratio` | quality | 133 | 186 | 319 | Comment-to-code ratio heuristic |
-| 16 | `over-defensive-coding` | quality | 241 | 152 | 393 | Complex pair-check patterns |
-| 17 | `dangerous-inner-html` | security | 49 | 85 | 134 | TSX/JSX parsing broken ([tractor#67](https://github.com/boukeversteegh/tractor/issues/67)) |
-| 18 | `placeholder-in-production` | security | 71 | 135 | 206 | Many regex patterns (doable) |
-| 19 | `unchecked-db-result` | correctness | 154 | 157 | 311 | Parent context check |
-| 20 | `mixed-concerns` | correctness | 104 | 129 | 233 | File-level import analysis |
-| 21 | `undeclared-import` | correctness | 563 | 284 | 847 | Needs package.json cross-reference |
-| 22 | `over-mocking` | testing | 159 | 212 | 371 | Counting comparison |
-| | **Not ported total** | | **1,837** | **1,790** | **3,627** | |
-
-### Potentially Portable (with Tractor improvements)
-
-| Rule | Needed Feature | Estimated Tractor Size |
-|------|---------------|----------------------|
-| ~~`god-function` (full)~~ | ~~Ported via `--meta`~~ | ~~done~~ |
-| `god-component` | Fix TSX/JSX parsing | ~8 lines |
-| `dangerous-inner-html` | Fix TSX/JSX parsing | ~5 lines |
-| `excessive-any` | Per-file counting (may already work) | ~5 lines |
-| ~~`dead-code-path`~~ | ~~Ported~~ — XPath `=` compares node text | ~~done~~ |
-| ~~`trivial-assertion`~~ | ~~Ported~~ — XPath `=` compares node text | ~~done~~ |
-| `placeholder-in-production` | Already possible (verbose `contains()`) | ~12 lines |
-| `unchecked-db-result` | `ancestor::` axis | ~6 lines |
+**Ported subset: 4,040 lines of TypeScript → 302 lines of YAML (13x reduction)**
 
 ## What This Proves
 
