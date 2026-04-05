@@ -1,5 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
-import { makeLineFinding } from "./utils.js";
+import { isTestFile, makeLineFinding } from "./utils.js";
 
 /**
  * Detects test files where mocking dominates over assertions.
@@ -17,13 +17,7 @@ import { makeLineFinding } from "./utils.js";
  * Flags when mockCount > assertionCount * ratio (default ratio: 1.0).
  */
 
-const TEST_FILE_PATTERN = /(?:test|spec|__test__|__spec__)/i;
-
 const DEFAULT_RATIO = 1.0;
-
-function isTestFile(filePath: string): boolean {
-  return TEST_FILE_PATTERN.test(filePath);
-}
 
 // JS/TS mock patterns
 const JS_MOCK_PATTERNS = [

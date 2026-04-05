@@ -1,5 +1,5 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
-import { makeFinding } from "./utils.js";
+import { isTestFile, makeFinding } from "./utils.js";
 
 /**
  * Detects test assertions that prove nothing:
@@ -11,8 +11,6 @@ import { makeFinding } from "./utils.js";
  *
  * Only runs on test files (path contains test, spec, __test__, __spec__).
  */
-
-const TEST_FILE_PATTERN = /(?:test|spec|__test__|__spec__)/i;
 
 const LITERAL_KINDS_JS = new Set([
   "true",
@@ -28,10 +26,6 @@ const LITERAL_KINDS_PY = new Set([
   "float",
   "string",
 ]);
-
-function isTestFile(filePath: string): boolean {
-  return TEST_FILE_PATTERN.test(filePath);
-}
 
 /** Normalize string literal text for comparison (handle single vs double quotes) */
 function normalizeStringLiteral(text: string): string {

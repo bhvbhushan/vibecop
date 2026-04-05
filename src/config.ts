@@ -27,6 +27,7 @@ const VibeCopConfigSchema = z.object({
     .array(z.string())
     .default(["**/node_modules/**", "**/dist/**", "**/build/**", "**/.next/**", "**/docs/**", "**/vendor/**", "**/*.min.js", "**/*.d.ts"]),
   "pr-gate": PrGateConfigSchema.optional(),
+  "custom-rules-dir": z.string().optional(),
 });
 
 export const DEFAULT_CONFIG: VibeCopConfig = {

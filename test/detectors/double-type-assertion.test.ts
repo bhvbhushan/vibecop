@@ -118,6 +118,12 @@ describe("double-type-assertion", () => {
     expect(findings.length).toBe(0);
   });
 
+  test("does NOT flag string containing 'as unknown as'", () => {
+    const ctx = makeCtx(`const s = "cast as unknown as string";`);
+    const findings = doubleTypeAssertion.detect(ctx);
+    expect(findings.length).toBe(0);
+  });
+
   test("detects multiple double assertions in one file", () => {
     const ctx = makeCtx(`
       const a = val1 as unknown as string;

@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
 import { Command } from "commander";
 import { loadConfig, DEFAULT_CONFIG } from "./config.js";
+import { loadCustomRules } from "./custom-rules.js";
 import { builtinDetectors } from "./detectors/index.js";
 import { EXTENSION_MAP, discoverFiles, pathsToFileInfos, runDetectors } from "./engine.js";
 import { getFormatter } from "./formatters/index.js";
@@ -140,9 +141,15 @@ async function scanAction(
     files = discoverFiles(scanRoot, config);
   }
 
+  // Load custom rules and merge with builtins
+  const customDetectors = loadCustomRules(
+    resolve(scanRoot, config["custom-rules-dir"] ?? ".vibecop/rules"),
+  );
+  const allDetectors = [...builtinDetectors, ...customDetectors];
+
   // Run detectors
   const maxFindings = Number.parseInt(options.maxFindings, 10);
-  const result = runDetectors(files, builtinDetectors, project, config, {
+  const result = runDetectors(files, allDetectors, project, config, {
     verbose: options.verbose,
     maxFindings: Number.isNaN(maxFindings) ? 50 : maxFindings,
   });
@@ -197,7 +204,12 @@ function checkAction(
   const project = loadProjectInfo(scanRoot);
   const maxFindings = Number.parseInt(options.maxFindings, 10);
 
-  const result = runDetectors([fileInfo], builtinDetectors, project, config, {
+  const customDetectors = loadCustomRules(
+    resolve(scanRoot, config["custom-rules-dir"] ?? ".vibecop/rules"),
+  );
+  const allDetectors = [...builtinDetectors, ...customDetectors];
+
+  const result = runDetectors([fileInfo], allDetectors, project, config, {
     verbose: options.verbose,
     maxFindings: Number.isNaN(maxFindings) ? 50 : maxFindings,
   });
@@ -234,7 +246,7 @@ function main(): void {
     .argument("[path]", "Directory to scan", ".")
     .option(
       "-f, --format <format>",
-      "Output format (text, json, github, sarif, html, agent)",
+      "Output format (text, json, github, sarif, html, agent, gcc)",
       "text",
     )
     .option("-c, --config <path>", "Path to config file")
@@ -256,7 +268,7 @@ function main(): void {
     .argument("<file>", "File to check")
     .option(
       "-f, --format <format>",
-      "Output format (text, json, github, sarif, html, agent)",
+      "Output format (text, json, github, sarif, html, agent, gcc)",
       "text",
     )
     .option(
@@ -274,6 +286,20 @@ function main(): void {
     .action(async () => {
       const { runInit } = await import("./init.js");
       await runInit();
+    });
+
+  program
+    .command("test-rules")
+    .description("Validate custom rules against their inline examples")
+    .option(
+      "--rules-dir <path>",
+      "Path to custom rules directory",
+      ".vibecop/rules",
+    )
+    .action(async (options: { rulesDir: string }) => {
+      const { runTestRules } = await import("./test-rules.js");
+      const result = runTestRules(resolve(options.rulesDir));
+      process.exit(result.failed > 0 ? 1 : 0);
     });
 
   program.parse();

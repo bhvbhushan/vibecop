@@ -73,6 +73,7 @@ export interface VibeCopConfig {
   rules: Record<string, RuleConfig>;
   ignore: string[];
   "pr-gate"?: PrGateConfig;
+  "custom-rules-dir"?: string;
 }
 
 /** Per-rule configuration */

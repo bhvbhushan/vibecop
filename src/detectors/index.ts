@@ -27,6 +27,12 @@ export { llmUnpinnedModel } from "./llm-unpinned-model.js";
 export { llmNoSystemMessage } from "./llm-no-system-message.js";
 export { llmTemperatureNotSet } from "./llm-temperature-not-set.js";
 export { hallucinatedPackage } from "./hallucinated-package.js";
+export { assertionRoulette } from "./assertion-roulette.js";
+export { sleepyTest } from "./sleepy-test.js";
+export { snapshotOnlyTest } from "./snapshot-only-test.js";
+export { emptyTest } from "./empty-test.js";
+export { conditionalTestLogic } from "./conditional-test-logic.js";
+export { noErrorPathTest } from "./no-error-path-test.js";
 
 import type { Detector } from "../types.js";
 import { emptyErrorHandler } from "./empty-error-handler.js";
@@ -58,6 +64,12 @@ import { llmUnpinnedModel } from "./llm-unpinned-model.js";
 import { llmNoSystemMessage } from "./llm-no-system-message.js";
 import { llmTemperatureNotSet } from "./llm-temperature-not-set.js";
 import { hallucinatedPackage } from "./hallucinated-package.js";
+import { assertionRoulette } from "./assertion-roulette.js";
+import { sleepyTest } from "./sleepy-test.js";
+import { snapshotOnlyTest } from "./snapshot-only-test.js";
+import { emptyTest } from "./empty-test.js";
+import { conditionalTestLogic } from "./conditional-test-logic.js";
+import { noErrorPathTest } from "./no-error-path-test.js";
 
 /** All built-in detectors */
 export const builtinDetectors: Detector[] = [
@@ -90,4 +102,10 @@ export const builtinDetectors: Detector[] = [
   llmNoSystemMessage,
   llmTemperatureNotSet,
   hallucinatedPackage,
+  assertionRoulette,
+  sleepyTest,
+  snapshotOnlyTest,
+  emptyTest,
+  conditionalTestLogic,
+  noErrorPathTest,
 ];
