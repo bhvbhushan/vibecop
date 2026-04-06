@@ -1,0 +1,114 @@
+---
+title: Quick Start
+description: Run your first vibecop scan in 60 seconds
+---
+
+## Scan a Directory
+
+```bash
+# Scan current directory
+vibecop scan .
+
+# Scan a specific directory
+vibecop scan src/
+```
+
+vibecop discovers all `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, and `.py` files, parses them with tree-sitter via ast-grep, runs all 35 detectors, and reports findings.
+
+## Reading the Output
+
+The default text output groups findings by file:
+
+```
+src/services/user.service.ts
+  45:1    error    Function 'processUserData' is too complex (232 lines, cyclomatic complexity 41, 3 params)  god-function
+  89:5    warning  Database or API call inside a loop — potential N+1 query  n-plus-one-query
+  145:5   warning  Database mutation result is not checked — errors will be silently ignored  unchecked-db-result
+
+src/components/PaymentModal.tsx
+  1:1     warning  Component has too many hooks (8 useState, 3 useEffect, 593 lines)  god-component
+  201:9   warning  dangerouslySetInnerHTML can lead to XSS attacks if the content is not sanitized  dangerous-inner-html
+
+src/config/auth.ts
+  12:5    error    Placeholder placeholder domain found: "yourdomain.com"  placeholder-in-production
+  18:5    error    Auth token stored in localStorage — vulnerable to XSS  token-in-localstorage
+
+✖ 7 problems (3 errors, 3 warnings, 1 info)
+```
+
+Each finding shows:
+- **Location** -- `file:line:column`
+- **Severity** -- `error`, `warning`, or `info`
+- **Message** -- human-readable description of the issue
+- **Detector ID** -- machine-readable rule name (e.g., `god-function`)
+
+## Check a Single File
+
+```bash
+vibecop check src/utils/api.ts
+```
+
+## JSON Output
+
+```bash
+vibecop scan src/ --format json
+```
+
+Returns structured JSON with `findings`, `filesScanned`, and `errors` fields. Useful for CI pipelines and programmatic consumption.
+
+## Scan Only Changed Files
+
+```bash
+# Scan only files changed vs HEAD (git diff)
+vibecop scan --diff HEAD
+
+# Scan files changed vs a branch
+vibecop scan --diff main
+```
+
+This is the most common usage in agent hooks -- scan only the files the agent just changed.
+
+## CI Mode
+
+vibecop exits with code 1 if any findings are found, making it suitable for CI gates:
+
+```bash
+vibecop scan . --format text
+# Exit code 0 = clean, 1 = findings found, 2 = scan error
+```
+
+## Output Formats
+
+| Format | Flag | Use Case |
+|--------|------|----------|
+| text | `--format text` | Default. Human-readable terminal output |
+| json | `--format json` | Programmatic consumption, CI pipelines |
+| github | `--format github` | `::error` annotations + `GITHUB_STEP_SUMMARY` |
+| sarif | `--format sarif` | GitHub Security tab upload (SARIF 2.1.0) |
+| html | `--format html` | Single-file HTML report |
+| agent | `--format agent` | AI coding tool hooks -- one finding per line, no color |
+| gcc | `--format gcc` | GCC-style output for editor integration |
+
+## Configuration
+
+Create `.vibecop.yml` in your project root to customize behavior:
+
+```yaml
+rules:
+  god-function:
+    severity: warning
+  debug-console-in-prod:
+    severity: "off"
+
+ignore:
+  - "**/dist/**"
+  - "**/vendor/**"
+```
+
+See [Configuration](/vibecop/configuration/config-file/) for the full reference.
+
+## Next Steps
+
+- [Set up agent integration](/vibecop/agent-integration/overview/) to run vibecop automatically
+- [Browse all 35 detectors](/vibecop/detectors/overview/)
+- [Configure rules and ignores](/vibecop/configuration/config-file/)

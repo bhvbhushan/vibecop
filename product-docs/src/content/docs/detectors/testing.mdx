@@ -1,0 +1,222 @@
+---
+title: Testing Detectors
+description: All 8 testing detectors with descriptions and examples
+---
+
+Testing detectors evaluate the quality of test code. AI agents frequently generate tests that pass but do not actually verify behavior: trivial assertions, excessive mocking, snapshot-only coverage, and missing error paths.
+
+## trivial-assertion
+
+**Severity:** info
+
+Assertions that always pass and test nothing meaningful.
+
+**What it catches:**
+
+```typescript
+expect(true).toBe(true);
+expect(1).toBe(1);
+expect('hello').toBe('hello');
+assert.ok(true);
+```
+
+```python
+assert True
+assert 1 == 1
+```
+
+**Why it matters:** AI agents generate these assertions to make tests pass. They inflate test counts without actually verifying any behavior.
+
+## over-mocking
+
+**Severity:** info
+
+Test files where the number of `jest.mock()`, `vi.mock()`, `jest.spyOn()`, or `vi.spyOn()` calls exceeds the number of assertions.
+
+**What it catches:**
+
+```typescript
+jest.mock('../services/auth');
+jest.mock('../services/db');
+jest.mock('../services/email');
+jest.mock('../services/queue');
+jest.mock('../utils/logger');
+
+test('should process user', () => {
+  const result = processUser(mockData);
+  expect(result).toBeDefined(); // 5 mocks, 1 weak assertion
+});
+```
+
+**Why it matters:** When mocks outnumber assertions, the test is verifying the mocking setup rather than the actual behavior. AI agents mock aggressively to avoid dealing with dependencies.
+
+## assertion-roulette
+
+**Severity:** warning
+
+Tests with more than 5 assertions (configurable). When a test has many assertions and one fails, it is hard to determine which behavior broke.
+
+**What it catches:**
+
+```typescript
+test('should handle user flow', () => {
+  expect(user.name).toBe('Alice');
+  expect(user.email).toBe('alice@example.com');
+  expect(user.role).toBe('admin');
+  expect(user.verified).toBe(true);
+  expect(user.loginCount).toBe(5);
+  expect(user.lastLogin).toBeDefined();
+  expect(user.preferences.theme).toBe('dark');
+  // 7 assertions in one test
+});
+```
+
+**Fix:** Split into focused tests:
+
+```typescript
+test('should set user identity', () => {
+  expect(user.name).toBe('Alice');
+  expect(user.email).toBe('alice@example.com');
+});
+
+test('should set user role', () => {
+  expect(user.role).toBe('admin');
+  expect(user.verified).toBe(true);
+});
+```
+
+**Why it matters:** AI agents generate monolithic tests with many assertions. When one fails, all subsequent assertions are skipped, hiding additional failures.
+
+## sleepy-test
+
+**Severity:** warning
+
+`setTimeout`, `sleep`, or `time.sleep` calls in test files that introduce timing dependencies.
+
+**What it catches:**
+
+```typescript
+test('should update after delay', async () => {
+  triggerUpdate();
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  expect(getState()).toBe('updated');
+});
+```
+
+```python
+def test_async_update():
+    trigger_update()
+    time.sleep(2)
+    assert get_state() == 'updated'
+```
+
+**Fix:** Use proper async utilities:
+
+```typescript
+test('should update after delay', async () => {
+  triggerUpdate();
+  await waitFor(() => expect(getState()).toBe('updated'));
+});
+```
+
+**Why it matters:** Sleep-based tests are flaky -- they pass on fast machines and fail on slow CI runners. AI agents use sleep as a simple way to wait for async operations.
+
+## snapshot-only-test
+
+**Severity:** info
+
+Test files where 100% of assertions are snapshot assertions (`toMatchSnapshot`, `toMatchInlineSnapshot`).
+
+**What it catches:**
+
+```typescript
+test('renders user card', () => {
+  const { container } = render(<UserCard user={mockUser} />);
+  expect(container).toMatchSnapshot();
+});
+
+test('renders empty state', () => {
+  const { container } = render(<UserCard user={null} />);
+  expect(container).toMatchSnapshot();
+});
+// entire file is snapshots
+```
+
+**Why it matters:** Snapshots verify that output has not changed, but they do not verify correctness. AI agents default to snapshot tests because they are easy to generate. A file with only snapshots provides no behavioral verification.
+
+## empty-test
+
+**Severity:** info
+
+Test functions with zero assertions.
+
+**What it catches:**
+
+```typescript
+test('should handle edge case', () => {
+  const result = processData(edgeCaseInput);
+  // no assertion — test always passes
+});
+```
+
+```typescript
+it('should validate input', async () => {
+  await validateInput(testData);
+  // no expect() call
+});
+```
+
+**Why it matters:** Tests without assertions always pass. AI agents sometimes generate test scaffolding (the `test()` block and setup code) without adding the actual verification step.
+
+## conditional-test-logic
+
+**Severity:** info
+
+Control flow (`if`, `switch`, ternary) inside test functions where assertions may not execute depending on the branch taken.
+
+**What it catches:**
+
+```typescript
+test('should handle response', () => {
+  const response = fetchData();
+  if (response.ok) {
+    expect(response.data).toBeDefined();
+  }
+  // if response is not ok, no assertion runs
+});
+```
+
+**Fix:** Test each path explicitly:
+
+```typescript
+test('should handle successful response', () => {
+  const response = fetchData({ mockSuccess: true });
+  expect(response.data).toBeDefined();
+});
+
+test('should handle error response', () => {
+  const response = fetchData({ mockError: true });
+  expect(response.error).toBeDefined();
+});
+```
+
+**Why it matters:** Conditional logic in tests means assertions might be skipped entirely. The test passes, but nothing was actually verified. AI agents generate conditional tests to handle multiple scenarios in a single test function.
+
+## no-error-path-test
+
+**Severity:** info
+
+Test files with 3 or more tests but zero tests for error/exception paths.
+
+**What it catches:** A test file like:
+
+```typescript
+describe('UserService', () => {
+  test('should create user', () => { /* ... */ });
+  test('should update user', () => { /* ... */ });
+  test('should delete user', () => { /* ... */ });
+  // no tests for: invalid input, not found, permission denied, network error
+});
+```
+
+**Why it matters:** AI agents generate happy-path tests but rarely test error conditions. Error handling is where most production bugs hide. A test suite without error path coverage gives false confidence.

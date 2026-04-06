@@ -1,16 +1,12 @@
 #!/usr/bin/env node
 
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { extname, relative, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { Command } from "commander";
-import { loadConfig, DEFAULT_CONFIG } from "./config.js";
-import { loadCustomRules } from "./custom-rules.js";
-import { builtinDetectors } from "./detectors/index.js";
-import { EXTENSION_MAP, discoverFiles, pathsToFileInfos, runDetectors } from "./engine.js";
+import { scan, checkFile } from "./engine.js";
 import { getFormatter } from "./formatters/index.js";
-import { loadProjectInfo } from "./project.js";
-import type { VibeCopConfig, FileInfo } from "./types.js";
+import type { ScanResult } from "./types.js";
 
 /** Read version from package.json */
 function getVersion(): string {
@@ -109,67 +105,38 @@ interface CheckOptions {
   groupBy: string;
 }
 
+/** Resolve file list for scan: stdin, git diff, or auto-discover */
+async function resolveFiles(
+  options: ScanOptions,
+  scanRoot: string,
+): Promise<string[] | undefined> {
+  if (options.stdinFiles) {
+    return readStdinFiles();
+  }
+  if (options.diff) {
+    return getGitDiffFiles(options.diff, scanRoot);
+  }
+  return undefined;
+}
+
 /** Execute the scan command */
 async function scanAction(
   scanPath: string | undefined,
   options: ScanOptions,
 ): Promise<void> {
   const scanRoot = resolve(scanPath ?? ".");
-
-  // Load config
-  // Commander's --no-config sets options.config to false
-  let config: VibeCopConfig;
-  if (options.config === false) {
-    config = { ...DEFAULT_CONFIG };
-  } else {
-    config = loadConfig(options.config || undefined);
-  }
-
-  // Load project info
-  const project = loadProjectInfo(scanRoot);
-
-  // Discover files
-  let files: FileInfo[];
-
-  if (options.stdinFiles) {
-    const stdinPaths = await readStdinFiles();
-    files = pathsToFileInfos(stdinPaths, scanRoot);
-  } else if (options.diff) {
-    const diffPaths = getGitDiffFiles(options.diff, scanRoot);
-    files = pathsToFileInfos(diffPaths, scanRoot);
-  } else {
-    files = discoverFiles(scanRoot, config);
-  }
-
-  // Load custom rules and merge with builtins
-  const customDetectors = loadCustomRules(
-    resolve(scanRoot, config["custom-rules-dir"] ?? ".vibecop/rules"),
-  );
-  const allDetectors = [...builtinDetectors, ...customDetectors];
-
-  // Run detectors
   const maxFindings = Number.parseInt(options.maxFindings, 10);
-  const result = runDetectors(files, allDetectors, project, config, {
-    verbose: options.verbose,
+  const files = await resolveFiles(options, scanRoot);
+
+  const result = await scan({
+    scanPath: scanRoot,
+    config: options.config,
     maxFindings: Number.isNaN(maxFindings) ? 50 : maxFindings,
+    verbose: options.verbose,
+    files,
   });
 
-  // Format and output
-  const groupBy = options.groupBy === "rule" ? "rule" : "file";
-  let formatter: (r: typeof result) => string;
-  try {
-    formatter = getFormatter(options.format, { groupBy });
-  } catch (err: unknown) {
-    process.stderr.write(
-      `${err instanceof Error ? err.message : String(err)}\n`,
-    );
-    process.exit(2);
-  }
-
-  writeOutput(formatter(result));
-
-  // Exit code: 1 if findings, 0 if clean
-  process.exit(result.findings.length > 0 ? 1 : 0);
+  formatAndExit(result, options.format, options.groupBy);
 }
 
 /** Execute the check command (single file) */
@@ -177,47 +144,34 @@ function checkAction(
   filePath: string,
   options: CheckOptions,
 ): void {
-  const absolutePath = resolve(filePath);
-  if (!existsSync(absolutePath)) {
-    process.stderr.write(`Error: File not found: ${filePath}\n`);
-    process.exit(2);
-  }
+  const maxFindings = Number.parseInt(options.maxFindings, 10);
 
-  const ext = extname(absolutePath);
-  const language = EXTENSION_MAP[ext];
-  if (!language) {
+  let result: ScanResult;
+  try {
+    result = checkFile(filePath, {
+      verbose: options.verbose,
+      maxFindings: Number.isNaN(maxFindings) ? 50 : maxFindings,
+    });
+  } catch (err: unknown) {
     process.stderr.write(
-      `Error: Unsupported file type: ${ext}. Supported: ${Object.keys(EXTENSION_MAP).join(", ")}\n`,
+      `Error: ${err instanceof Error ? err.message : String(err)}\n`,
     );
     process.exit(2);
   }
 
-  const scanRoot = resolve(".");
-  const fileInfo: FileInfo = {
-    path: relative(scanRoot, absolutePath),
-    absolutePath,
-    language,
-    extension: ext,
-  };
+  formatAndExit(result, options.format, options.groupBy);
+}
 
-  const config = { ...DEFAULT_CONFIG };
-  const project = loadProjectInfo(scanRoot);
-  const maxFindings = Number.parseInt(options.maxFindings, 10);
-
-  const customDetectors = loadCustomRules(
-    resolve(scanRoot, config["custom-rules-dir"] ?? ".vibecop/rules"),
-  );
-  const allDetectors = [...builtinDetectors, ...customDetectors];
-
-  const result = runDetectors([fileInfo], allDetectors, project, config, {
-    verbose: options.verbose,
-    maxFindings: Number.isNaN(maxFindings) ? 50 : maxFindings,
-  });
-
-  const groupBy = options.groupBy === "rule" ? "rule" : "file";
-  let formatter: (r: typeof result) => string;
+/** Format scan results and exit with appropriate code */
+function formatAndExit(
+  result: ScanResult,
+  format: string,
+  groupBy: string,
+): never {
+  const groupByMode = groupBy === "rule" ? "rule" : "file";
+  let formatter: (r: ScanResult) => string;
   try {
-    formatter = getFormatter(options.format, { groupBy });
+    formatter = getFormatter(format, { groupBy: groupByMode });
   } catch (err: unknown) {
     process.stderr.write(
       `${err instanceof Error ? err.message : String(err)}\n`,
@@ -286,6 +240,14 @@ function main(): void {
     .action(async () => {
       const { runInit } = await import("./init.js");
       await runInit();
+    });
+
+  program
+    .command("serve")
+    .description("Start MCP server (stdio transport)")
+    .action(async () => {
+      const { startServer } = await import("./mcp/index.js");
+      await startServer();
     });
 
   program

@@ -1,0 +1,89 @@
+---
+title: Detector Overview
+description: All 35 vibecop detectors in a single reference
+---
+
+vibecop ships 35 detectors across 4 categories. Every detector is deterministic -- same input always produces the same output, with zero LLM calls.
+
+## All Detectors
+
+### Quality (16 detectors)
+
+| ID | Name | Description | Severity |
+|----|------|-------------|----------|
+| `god-function` | God Function | Functions exceeding line, complexity, or parameter thresholds | error/warning |
+| `god-component` | God Component | React components with too many hooks, lines, or imports | warning |
+| `n-plus-one-query` | N+1 Query | DB/API calls inside loops or `.map(async ...)` callbacks | warning |
+| `unbounded-query` | Unbounded Query | `findMany`/`findAll` without a `take`/`limit` clause | info |
+| `debug-console-in-prod` | Debug Console in Prod | `console.log`/`console.debug` left in production code | warning |
+| `dead-code-path` | Dead Code Path | Identical if/else branches, unreachable code after return/throw | warning |
+| `double-type-assertion` | Double Type Assertion | `as unknown as X` patterns that bypass TypeScript type safety | warning |
+| `excessive-any` | Excessive Any | Files with 4+ `any` type annotations | warning |
+| `todo-in-production` | TODO in Production | TODO/FIXME/HACK comments, escalated if security-related | info/warning |
+| `empty-error-handler` | Empty Error Handler | Catch/except blocks that silently swallow errors | warning |
+| `excessive-comment-ratio` | Excessive Comment Ratio | Files with >50% comment lines | info |
+| `over-defensive-coding` | Over-Defensive Coding | Redundant null checks on values that cannot be null | info |
+| `llm-call-no-timeout` | LLM Call No Timeout | `new OpenAI()`/`new Anthropic()` without timeout, `.create()` without max_tokens | warning |
+| `llm-unpinned-model` | LLM Unpinned Model | Moving model aliases like `"gpt-4o"` that silently change behavior | warning |
+| `llm-temperature-not-set` | LLM Temperature Not Set | LLM `.create()` calls without explicit `temperature` parameter | info |
+| `llm-no-system-message` | LLM No System Message | Chat API calls without a `role: "system"` message | info |
+
+### Security (7 detectors)
+
+| ID | Name | Description | Severity |
+|----|------|-------------|----------|
+| `sql-injection` | SQL Injection | Template literals or string concatenation in SQL query methods | error |
+| `dangerous-inner-html` | Dangerous innerHTML | `dangerouslySetInnerHTML` usage without sanitization | warning |
+| `token-in-localstorage` | Token in localStorage | Auth/JWT tokens stored in XSS-accessible storage | error |
+| `placeholder-in-production` | Placeholder in Production | `yourdomain.com`, `changeme`, `xxx` left in config | error |
+| `insecure-defaults` | Insecure Defaults | `eval()`, `rejectUnauthorized: false`, hardcoded credentials | error |
+| `unsafe-shell-exec` | Unsafe Shell Exec | `exec()`/`execSync()` with dynamic args, `subprocess` with `shell=True` | error |
+| `dynamic-code-exec` | Dynamic Code Exec | `eval(variable)`, `new Function(variable)` with non-literal arguments | error |
+
+### Correctness (4 detectors)
+
+| ID | Name | Description | Severity |
+|----|------|-------------|----------|
+| `unchecked-db-result` | Unchecked DB Result | Fire-and-forget database mutations (insert/update/delete) | warning |
+| `undeclared-import` | Undeclared Import | Imports not declared in package.json/requirements.txt | error |
+| `mixed-concerns` | Mixed Concerns | Files importing both UI frameworks and database/server libraries | warning |
+| `hallucinated-package` | Hallucinated Package | Dependencies not in top-5K npm allowlist (potential AI hallucination) | info |
+
+### Testing (8 detectors)
+
+| ID | Name | Description | Severity |
+|----|------|-------------|----------|
+| `trivial-assertion` | Trivial Assertion | `expect(true).toBe(true)` and similar no-op tests | info |
+| `over-mocking` | Over-Mocking | Test files with excessive mock/spy usage | info |
+| `assertion-roulette` | Assertion Roulette | Tests with too many assertions (default >5) | warning |
+| `sleepy-test` | Sleepy Test | `setTimeout`/`time.sleep` in tests causing flaky CI | warning |
+| `snapshot-only-test` | Snapshot-Only Test | Test files where 100% of assertions are snapshots | info |
+| `empty-test` | Empty Test | Test functions with zero assertions | info |
+| `conditional-test-logic` | Conditional Test Logic | Control flow in tests where assertions may not execute | info |
+| `no-error-path-test` | No Error Path Test | Test files with 3+ tests but no error path testing | info |
+
+## Category Breakdown
+
+| Category | Count | Focus |
+|----------|:-----:|-------|
+| Quality | 16 | Code structure, complexity, LLM API usage |
+| Security | 7 | Injection, unsafe execution, credential storage |
+| Correctness | 4 | Missing dependencies, unchecked results, hallucinated packages |
+| Testing | 8 | Test quality, assertion validity, mock overuse |
+
+## Severity Levels
+
+| Severity | Meaning | Exit Code |
+|----------|---------|:---------:|
+| `error` | Must fix -- security vulnerability or correctness bug | 1 |
+| `warning` | Should fix -- code quality or maintainability issue | 1 |
+| `info` | Consider fixing -- style or best practice suggestion | 1 |
+
+All severity levels cause exit code 1. Use `.vibecop.yml` to change severity levels or disable specific detectors.
+
+## Detailed Pages
+
+- [Quality Detectors](/vibecop/detectors/quality/) -- all 16 quality detectors with examples
+- [Security Detectors](/vibecop/detectors/security/) -- all 7 security detectors with examples
+- [Correctness Detectors](/vibecop/detectors/correctness/) -- all 4 correctness detectors with examples
+- [Testing Detectors](/vibecop/detectors/testing/) -- all 8 testing detectors with examples

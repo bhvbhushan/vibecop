@@ -1,0 +1,171 @@
+---
+title: Architecture
+description: How vibecop works internally — engine data flow, detector patterns, and tech stack
+---
+
+## High-Level Architecture
+
+```
+vibecop CLI (Commander.js)
+├── Scan Engine           — discovers files, loads AST, runs detectors, dedup by priority
+├── MCP Server            — stdio transport, 3 tools (scan, check, explain)
+├── Init Wizard           — auto-detects AI tools, generates hook/rule configs
+├── Custom Rules Engine   — loads .vibecop/rules/*.yaml, validates with Zod, runs via ast-grep
+├── Config Loader (Zod)   — validates .vibecop.yml, merges defaults, per-rule config
+├── Detectors (35)        — AST pattern matching via ast-grep (@ast-grep/napi)
+├── Formatters (7)        — text, json, html, sarif, github, agent, gcc output
+├── Project Analyzer      — parses package.json, requirements.txt, lockfiles
+└── GitHub Action         — diff parser, finding filter, PR review poster
+```
+
+## File Layout
+
+```
+vibecop/
+├── src/
+│   ├── cli.ts                  — Commander.js entry (scan, check, init, serve, test-rules)
+│   ├── engine.ts               — File discovery, detector runner, dedup, report builder
+│   ├── config.ts               — .vibecop.yml loading + Zod validation
+│   ├── project.ts              — Parse package.json, lock files, manifests → ProjectInfo
+│   ├── init.ts                 — vibecop init setup wizard
+│   ├── custom-rules.ts         — YAML rule loader + Zod validation + ast-grep execution
+│   ├── test-rules.ts           — Test runner for custom rule examples
+│   ├── types.ts                — Detector, DetectionContext, Finding, ProjectInfo, etc.
+│   ├── formatters/
+│   │   ├── index.ts            — Formatter registry
+│   │   ├── text.ts             — Default: stylish terminal output
+│   │   ├── json.ts             — Structured JSON output
+│   │   ├── sarif.ts            — SARIF 2.1.0 format (~80 LOC hand-rolled)
+│   │   ├── github.ts           — ::error annotations + GITHUB_STEP_SUMMARY
+│   │   ├── html.ts             — Single-file HTML report
+│   │   ├── agent.ts            — Token-efficient one-per-line for AI hooks
+│   │   └── gcc.ts              — GCC-style for editor integration
+│   ├── mcp/
+│   │   ├── index.ts            — MCP module entry, server creation + transport
+│   │   └── server.ts           — Tool handlers: scan, check, explain
+│   ├── detectors/
+│   │   ├── index.ts            — Detector registry (all 35 built-in detectors)
+│   │   ├── utils.ts            — makeFinding/makeLineFinding helpers
+│   │   └── *.ts                — One file per detector
+│   ├── action/
+│   │   ├── main.ts             — GitHub Action entry point
+│   │   ├── diff.ts             — PR diff parser
+│   │   ├── filter.ts           — Finding filter (only changed lines)
+│   │   ├── review.ts           — PR review comment poster
+│   │   └── summary.ts          — Summary comment generator
+│   └── data/
+│       └── known-packages.json — Bundled npm allowlist for hallucinated-package
+├── test/                       — bun test suite
+├── examples/                   — Example configs for 7 AI coding tools
+├── docs/                       — Design docs, benchmarks, agent integration guide
+├── package.json
+├── tsconfig.json
+└── .vibecop.yml                — Self-dogfood config
+```
+
+## Engine Data Flow
+
+```
+CLI args
+  → loadConfig(.vibecop.yml or defaults)
+  → loadProjectInfo(package.json, lock files, requirements.txt, pyproject.toml)
+  → discoverFiles(path, config.ignore, .gitignore)
+  → for each file:
+      → parse with ast-grep (language auto-detected from extension)
+      → run each enabled detector(ctx) → Finding[]
+      → isolate: if detector throws, log error, continue
+  → aggregate all findings
+  → dedupFindings: group by file:line, keep highest priority
+  → apply --max-findings N cap (default 50)
+  → format(findings, --format flag)
+  → exit(findings.length > 0 ? 1 : 0)
+```
+
+### Engine Dedup
+
+When multiple detectors flag the same `file:line`, the engine keeps only the highest-priority finding. Priority is set via `DetectorMeta.priority` (default: 0). The LLM/agent safety detectors use `priority: 10` so they take precedence over general quality detectors.
+
+### Detector Isolation
+
+If a detector throws during execution, the engine catches the error, logs it (with the detector ID and file path), and continues running the remaining detectors. A single broken detector never crashes the entire scan.
+
+## Core Interfaces
+
+```typescript
+interface Detector {
+  id: string;
+  meta: DetectorMeta;
+  detect(ctx: DetectionContext): Finding[];
+}
+
+interface DetectorMeta {
+  name: string;
+  description: string;
+  severity: 'error' | 'warning' | 'info';
+  category: 'correctness' | 'quality' | 'security' | 'testing';
+  languages: Lang[];
+  priority?: number;  // Higher priority wins in dedup (default: 0)
+}
+
+interface DetectionContext {
+  file: FileInfo;
+  root: SgRoot;              // ast-grep root node
+  source: string;            // raw file text
+  project: ProjectInfo;      // dependencies, lock file data
+  config: RuleConfig;        // per-rule config overrides
+}
+
+interface Finding {
+  detectorId: string;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+  file: string;
+  line: number;
+  column: number;
+  endLine?: number;
+  endColumn?: number;
+  suggestion?: string;
+}
+```
+
+## Tech Stack
+
+| Component | Choice | Rationale |
+|-----------|--------|-----------|
+| Runtime | Node.js 20+ / Bun | Bun for development, Node.js for broad end-user compatibility |
+| Language | TypeScript | Type safety for AST operations |
+| Parser | @ast-grep/napi | 13K stars, 9 platform binaries, 10-50x faster than raw tree-sitter |
+| Python support | @ast-grep/lang-python | One import + `registerDynamicLanguage()` |
+| CLI framework | Commander.js | Standard, widely understood |
+| Config validation | Zod | Schema validation with clear error messages |
+| SARIF output | @types/sarif (types only) | Hand-rolled ~80 LOC serializer, no runtime dependency |
+| MCP server | @modelcontextprotocol/sdk | Official MCP SDK, stdio transport |
+| Test runner | bun test | Built-in, no extra dependency |
+| Build tool | bun build | Built-in, produces single executable |
+| Distribution | npm | `npx vibecop scan` -- largest reach |
+
+## Error Handling
+
+The engine handles these error conditions explicitly:
+
+| Error | Behavior |
+|-------|----------|
+| **EACCES** (permission denied) | Log warning, skip file, continue |
+| **ELOOP** (symlink loop) | Log warning, skip file, continue |
+| **Detector throw** | Isolated per-detector: log error with detector ID + file, continue |
+| **Detector timeout** | Per-detector timeout enforced; exceeded detectors are skipped with a warning |
+| **EPIPE** (piped output closed) | Exit cleanly, no stack trace |
+| **Git errors** | `--diff` ref not found or not a git repo: clear error message, exit 2 |
+
+## MCP Server Architecture
+
+```
+MCP Client (Continue.dev / Amazon Q / Zed)
+  ↕ JSON-RPC over stdio
+vibecop MCP Server (@modelcontextprotocol/sdk)
+  → vibecop_scan  → engine.scan()
+  → vibecop_check → engine.checkFile()
+  → vibecop_explain → detector metadata lookup
+```
+
+The MCP server reuses the same `scan()` and `checkFile()` functions as the CLI. Tool input schemas are defined with Zod. The server handles graceful shutdown on SIGINT/SIGTERM.

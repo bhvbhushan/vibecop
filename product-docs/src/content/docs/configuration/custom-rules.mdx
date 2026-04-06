@@ -1,0 +1,219 @@
+---
+title: Custom Rules
+description: Write your own vibecop rules using YAML and ast-grep patterns
+---
+
+vibecop supports custom rules defined in YAML files. Custom rules use [ast-grep pattern syntax](https://ast-grep.github.io/guide/rule-config.html) for AST-based matching, giving you the full power of tree-sitter pattern matching without writing TypeScript.
+
+## Directory Setup
+
+Create a `.vibecop/rules/` directory in your project root:
+
+```
+.vibecop/
+  rules/
+    no-console-error.yaml
+    require-error-boundary.yaml
+```
+
+Then reference it in `.vibecop.yml`:
+
+```yaml
+custom-rules-dir: .vibecop/rules
+```
+
+If `custom-rules-dir` is not set, vibecop looks for `.vibecop/rules/` by default.
+
+## YAML Rule Format
+
+Each `.yaml` or `.yml` file in the rules directory defines one rule:
+
+```yaml
+id: no-console-error
+name: No Console Error
+description: Disallow console.error in production code
+severity: warning
+category: quality
+languages:
+  - typescript
+  - javascript
+message: "console.error() found. Use a structured logger instead."
+suggestion: "Replace with logger.error() from your logging library."
+rule:
+  pattern: console.error($$$ARGS)
+examples:
+  valid:
+    - "logger.error('something failed', error);"
+  invalid:
+    - "console.error('something failed', error);"
+```
+
+## Schema Reference
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `id` | string | Yes | Unique rule ID (lowercase, hyphens, starts with letter) |
+| `name` | string | Yes | Human-readable name |
+| `description` | string | Yes | What the rule detects |
+| `severity` | `error` / `warning` / `info` | Yes | Finding severity |
+| `category` | `correctness` / `quality` / `security` / `testing` | Yes | Rule category |
+| `languages` | array | Yes | Languages to check: `javascript`, `typescript`, `tsx`, `python` |
+| `message` | string | Yes | Message shown in findings |
+| `suggestion` | string | No | How to fix the issue |
+| `rule` | object | Yes | ast-grep rule object (pattern matching config) |
+| `examples` | object | No | Test cases for validation |
+
+### The `id` Field
+
+Must match the regex `^[a-z][a-z0-9-]*$`. Examples: `no-console-error`, `require-auth-check`, `ban-eval`.
+
+### The `rule` Field
+
+The `rule` field is an ast-grep rule object. It supports the full ast-grep rule configuration syntax:
+
+```yaml
+# Simple pattern match
+rule:
+  pattern: console.error($$$ARGS)
+
+# Match with constraints
+rule:
+  pattern: fetch($URL)
+  not:
+    inside:
+      pattern: try { $$$ } catch ($ERR) { $$$ }
+
+# Match specific node kinds
+rule:
+  kind: call_expression
+  has:
+    pattern: eval($ARG)
+```
+
+See the [ast-grep rule reference](https://ast-grep.github.io/reference/rule.html) for the complete rule syntax.
+
+### The `examples` Field
+
+Provide test cases to validate your rule:
+
+```yaml
+examples:
+  valid:
+    - "logger.error('something failed');"
+    - "console.log('debug info');"
+  invalid:
+    - "console.error('something failed');"
+    - "console.error(error);"
+```
+
+- `valid` examples should **not** trigger the rule
+- `invalid` examples **should** trigger the rule
+
+## Testing Custom Rules
+
+Run `vibecop test-rules` to validate your custom rules against their inline examples:
+
+```bash
+vibecop test-rules
+```
+
+Or specify a custom rules directory:
+
+```bash
+vibecop test-rules --rules-dir .vibecop/rules
+```
+
+Output:
+
+```
+✓ no-console-error: 2 invalid examples matched, 2 valid examples clean
+✓ require-error-boundary: 1 invalid example matched, 1 valid example clean
+✗ ban-eval: invalid example 1 did not match (rule may be wrong)
+
+2 rules passed, 1 rule failed
+```
+
+The command exits with code 1 if any rules fail, making it suitable for CI.
+
+## Example Rules
+
+### Ban `setTimeout` in Non-Test Files
+
+```yaml
+id: no-settimeout
+name: No setTimeout
+description: Disallow setTimeout in production code
+severity: warning
+category: quality
+languages:
+  - typescript
+  - javascript
+message: "setTimeout() found. Use a proper scheduling mechanism."
+suggestion: "Use a task queue or cron job for delayed execution."
+rule:
+  pattern: setTimeout($CALLBACK, $DELAY)
+examples:
+  valid:
+    - "scheduleTask(callback, delay);"
+  invalid:
+    - "setTimeout(() => { process(); }, 1000);"
+```
+
+### Require `try/catch` Around Fetch
+
+```yaml
+id: unhandled-fetch
+name: Unhandled Fetch
+description: fetch() calls without error handling
+severity: warning
+category: correctness
+languages:
+  - typescript
+  - javascript
+message: "fetch() without try/catch. Network requests can fail."
+suggestion: "Wrap in try/catch or add .catch() handler."
+rule:
+  pattern: await fetch($$$ARGS)
+  not:
+    inside:
+      kind: try_statement
+examples:
+  invalid:
+    - |
+      async function getData() {
+        const res = await fetch('/api/data');
+        return res.json();
+      }
+```
+
+### Ban `any` Type Annotation
+
+```yaml
+id: no-any-type
+name: No Any Type
+description: Disallow explicit any type annotations
+severity: warning
+category: quality
+languages:
+  - typescript
+  - tsx
+message: "Explicit 'any' type used. Provide a specific type."
+suggestion: "Replace with a proper type or use 'unknown' if the type is truly unknown."
+rule:
+  pattern: "$NAME: any"
+examples:
+  valid:
+    - "const value: string = 'hello';"
+  invalid:
+    - "const value: any = getData();"
+```
+
+## How Custom Rules Work
+
+1. At startup, vibecop loads all `.yaml`/`.yml` files from the custom rules directory
+2. Each file is parsed and validated against the `CustomRuleSchema` (Zod)
+3. Valid rules are converted to `Detector` objects
+4. During scanning, custom rule detectors run alongside built-in detectors
+5. Custom rules respect the same ignore patterns and severity overrides as built-in rules
+
+Invalid rule files produce warnings but do not stop the scan -- other rules and built-in detectors continue to run.

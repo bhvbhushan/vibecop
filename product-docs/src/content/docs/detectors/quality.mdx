@@ -1,0 +1,289 @@
+---
+title: Quality Detectors
+description: All 16 quality detectors with descriptions and examples
+---
+
+Quality detectors identify code structure and maintainability issues common in AI-generated code. These include god functions, N+1 queries, dead code, excessive `any` usage, and LLM API misuse.
+
+## god-function
+
+**Severity:** error (>200 lines or complexity >40) / warning (>100 lines or complexity >20)
+
+Functions exceeding line count, cyclomatic complexity, or parameter thresholds.
+
+**What it catches:**
+
+```typescript
+// 232-line function with cyclomatic complexity 41
+async function processUserData(data: any, options: any, config: any) {
+  // ... 232 lines of nested logic
+}
+```
+
+**Why it matters:** AI agents tend to generate monolithic functions that handle multiple responsibilities. These are hard to test, review, and maintain.
+
+**Configuration:** Thresholds can be tuned via `.vibecop.yml`.
+
+## god-component
+
+**Severity:** warning
+
+React components with too many hooks, lines, or imports.
+
+**What it catches:**
+
+```tsx
+function PaymentModal() {
+  const [step, setStep] = useState(0);
+  const [amount, setAmount] = useState(0);
+  const [currency, setCurrency] = useState('USD');
+  // ... 8 useState, 3 useEffect, 593 lines total
+}
+```
+
+**Why it matters:** AI agents often pack all logic into a single component rather than composing smaller ones.
+
+## n-plus-one-query
+
+**Severity:** warning
+
+Database or API calls inside loops or `.map(async ...)` callbacks.
+
+**What it catches:**
+
+```typescript
+for (const user of users) {
+  const orders = await db.orders.findMany({ where: { userId: user.id } });
+}
+```
+
+**Why it matters:** Each iteration executes a separate query. With 100 users, that's 101 queries instead of 1. AI agents frequently generate this pattern when iterating over collections.
+
+## unbounded-query
+
+**Severity:** info
+
+`findMany`/`findAll` without a `take`/`limit` clause.
+
+**What it catches:**
+
+```typescript
+const allUsers = await prisma.user.findMany();
+```
+
+**Why it matters:** Without a limit, this fetches every row in the table. On production databases, this can cause memory exhaustion and slow responses.
+
+## debug-console-in-prod
+
+**Severity:** warning
+
+`console.log`/`console.debug` statements left in production code (non-test files).
+
+**What it catches:**
+
+```typescript
+console.log('user data:', userData);
+console.debug('response:', response);
+```
+
+**Why it matters:** AI agents scatter `console.log` statements throughout generated code for debugging, then forget to remove them.
+
+## dead-code-path
+
+**Severity:** warning
+
+Identical if/else branches, unreachable code after return/throw.
+
+**What it catches:**
+
+```typescript
+if (condition) {
+  return processData(data);
+} else {
+  return processData(data); // identical branch
+}
+```
+
+**Why it matters:** AI agents sometimes generate conditional branches that do the same thing, or leave code after early returns.
+
+## double-type-assertion
+
+**Severity:** warning
+
+`as unknown as X` patterns that bypass TypeScript type safety.
+
+**What it catches:**
+
+```typescript
+const user = response as unknown as User;
+```
+
+**Why it matters:** Double assertions silence TypeScript completely. AI agents use this shortcut instead of fixing the actual type mismatch.
+
+## excessive-any
+
+**Severity:** warning
+
+Files with 4+ `any` type annotations.
+
+**What it catches:**
+
+```typescript
+function processData(input: any, config: any): any {
+  const result: any = transform(input);
+  return result;
+}
+```
+
+**Why it matters:** AI agents default to `any` when they cannot infer the correct type, defeating the purpose of TypeScript.
+
+## todo-in-production
+
+**Severity:** info (general) / warning (security-related)
+
+TODO/FIXME/HACK comments left in production code.
+
+**What it catches:**
+
+```typescript
+// TODO: add input validation before database query
+// FIXME: this is vulnerable to SQL injection
+// HACK: hardcoded API key for now
+```
+
+**Why it matters:** AI agents leave TODO comments as placeholders for unimplemented logic. Security-related TODOs are escalated to warning severity.
+
+## empty-error-handler
+
+**Severity:** warning
+
+Catch/except blocks that silently swallow errors.
+
+**What it catches:**
+
+```typescript
+try {
+  await saveUser(data);
+} catch (e) {
+  console.log(e); // logs but does not handle
+}
+```
+
+```python
+try:
+    save_user(data)
+except:
+    pass  # silently swallowed
+```
+
+**Why it matters:** AI agents wrap code in try/catch but do not implement meaningful error handling. Errors disappear silently.
+
+## excessive-comment-ratio
+
+**Severity:** info
+
+Files where more than 50% of lines are comments.
+
+**What it catches:** Files with extensive AI-generated documentation comments that inflate the codebase without adding value.
+
+**Why it matters:** AI agents tend to over-document with verbose JSDoc and inline comments, sometimes generating more comments than code.
+
+**Configuration:** The threshold (default 0.5) can be tuned in `.vibecop.yml`.
+
+## over-defensive-coding
+
+**Severity:** info
+
+Redundant null checks on values that cannot be null.
+
+**What it catches:**
+
+```typescript
+const items = getItems(); // returns Item[], never null
+if (items !== null && items !== undefined) {
+  // unnecessary null check
+}
+```
+
+**Why it matters:** AI agents add defensive null checks everywhere, even where the type system guarantees a value exists.
+
+## llm-call-no-timeout
+
+**Severity:** warning
+
+`new OpenAI()` or `new Anthropic()` constructors without a `timeout` option, and `.create()` calls without `max_tokens`.
+
+**What it catches:**
+
+```typescript
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// missing: timeout option
+
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: prompt }],
+  // missing: max_tokens
+});
+```
+
+**Why it matters:** Without timeouts, LLM calls can hang indefinitely. Without `max_tokens`, responses can be unexpectedly large and expensive. Source: SpecDetect4LLM (UMM pattern).
+
+## llm-unpinned-model
+
+**Severity:** warning
+
+Moving model aliases like `"gpt-4o"` or `"claude-3-sonnet"` that silently change behavior when the provider updates the alias.
+
+**What it catches:**
+
+```typescript
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o', // alias — could point to different model tomorrow
+});
+```
+
+**Fix:** Pin to a dated version:
+
+```typescript
+model: 'gpt-4o-2024-08-06'
+```
+
+**Why it matters:** Model aliases are moving targets. Your application's behavior can change without any code change. Source: SpecDetect4LLM (NMVP pattern).
+
+## llm-temperature-not-set
+
+**Severity:** info
+
+LLM `.create()` calls without an explicit `temperature` parameter.
+
+**What it catches:**
+
+```typescript
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o-2024-08-06',
+  messages: [...],
+  // missing: temperature
+});
+```
+
+**Why it matters:** The default temperature varies by provider and model. Explicit temperature ensures consistent output behavior. Source: SpecDetect4LLM (TNES pattern).
+
+## llm-no-system-message
+
+**Severity:** info
+
+Chat API calls without a `role: "system"` message in the messages array.
+
+**What it catches:**
+
+```typescript
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o-2024-08-06',
+  messages: [
+    { role: 'user', content: 'Summarize this document' },
+    // missing: system message
+  ],
+});
+```
+
+**Why it matters:** System messages set the behavior, constraints, and output format for the model. Without them, the model operates without guardrails. Source: SpecDetect4LLM (NSM pattern).

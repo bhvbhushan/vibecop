@@ -1,7 +1,7 @@
 import type { Detector, DetectionContext, Finding } from "../types.js";
 import { makeLineFinding } from "./utils.js";
 
-const TEST_FILE_RE = /(?:[\\/](?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__)[\\/]|\.(?:test|spec|e2e)\.[^.]+$)/i;
+const SKIP_FILE_RE = /(?:(?:^|[\\/])(?:test|tests|__tests__|__test__|spec|__spec__|__mocks__|fixtures|__fixtures__|examples|example|samples|sample|mock|mocks|stubs|demo|demos)[\\/]|\.(?:test|spec|e2e|fixture|example|mock|sample)\.[^.]+$|\.example$|\.md$)/i;
 
 const PLACEHOLDER_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
   { pattern: /["'].*yourdomain\.com.*["']/, description: "placeholder domain" },
@@ -21,7 +21,7 @@ const CONFIG_CONTEXTS = /(?:domain|host|url|endpoint|origin|cookie|cors|config|e
 
 function detect(ctx: DetectionContext): Finding[] {
   const findings: Finding[] = [];
-  if (TEST_FILE_RE.test(ctx.file.path)) return findings;
+  if (SKIP_FILE_RE.test(ctx.file.path)) return findings;
 
   const lines = ctx.source.split("\n");
 

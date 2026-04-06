@@ -29,6 +29,7 @@ function makeCtx(
   options: {
     language?: "typescript" | "javascript" | "python";
     filePath?: string;
+    config?: Record<string, unknown>;
   } = {},
 ): DetectionContext {
   const language = options.language ?? "typescript";
@@ -51,7 +52,7 @@ function makeCtx(
     language,
     extension: extMap[language],
   };
-  return { file, root, source, project: EMPTY_PROJECT, config: {} };
+  return { file, root, source, project: EMPTY_PROJECT, config: options.config ?? {} };
 }
 
 describe("debug-console-in-prod", () => {
@@ -108,18 +109,16 @@ describe("debug-console-in-prod", () => {
       expect(findings.length).toBe(0);
     });
 
-    test("detects console.dir in production", () => {
+    test("does NOT flag console.dir by default (diagnostic tool)", () => {
       const ctx = makeCtx(`console.dir(myObject);`);
       const findings = debugConsoleInProd.detect(ctx);
-      expect(findings.length).toBe(1);
-      expect(findings[0].message).toContain("console.dir");
+      expect(findings.length).toBe(0);
     });
 
-    test("detects console.table in production", () => {
+    test("does NOT flag console.table by default (diagnostic tool)", () => {
       const ctx = makeCtx(`console.table(data);`);
       const findings = debugConsoleInProd.detect(ctx);
-      expect(findings.length).toBe(1);
-      expect(findings[0].message).toContain("console.table");
+      expect(findings.length).toBe(0);
     });
 
     test("detects multiple console calls", () => {
@@ -130,6 +129,116 @@ describe("debug-console-in-prod", () => {
       `);
       const findings = debugConsoleInProd.detect(ctx);
       expect(findings.length).toBe(2);
+    });
+
+    test("does NOT flag console.info by default (structured logging)", () => {
+      const ctx = makeCtx(`console.info("server started on port 3000");`);
+      const findings = debugConsoleInProd.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag console.trace by default", () => {
+      const ctx = makeCtx(`console.trace("call stack");`);
+      const findings = debugConsoleInProd.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag console.group/groupEnd by default", () => {
+      const ctx = makeCtx(`console.group("section");\nconsole.groupEnd();`);
+      const findings = debugConsoleInProd.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    describe("CLI/server path skipping", () => {
+      test("does NOT flag console.log in bin/ directory", () => {
+        const ctx = makeCtx(`console.log("starting...");`, {
+          filePath: "bin/run.ts",
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+
+      test("does NOT flag console.log in cli/ directory", () => {
+        const ctx = makeCtx(`console.log("usage: ...");`, {
+          filePath: "src/cli/main.ts",
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+
+      test("does NOT flag console.log in server/ directory", () => {
+        const ctx = makeCtx(`console.log("listening on port 8080");`, {
+          filePath: "src/server/app.ts",
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+
+      test("does NOT flag console.log in cli.ts entry point", () => {
+        const ctx = makeCtx(`console.log("version 1.0.0");`, {
+          filePath: "src/cli.ts",
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+
+      test("does NOT flag console.log in server.js entry point", () => {
+        const ctx = makeCtx(`console.log("server ready");`, {
+          filePath: "src/server.js",
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+
+      test("does NOT flag console.log in index.ts entry point", () => {
+        const ctx = makeCtx(`console.log("init");`, {
+          filePath: "src/index.ts",
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+
+      test("does NOT flag console.log in daemon/ directory", () => {
+        const ctx = makeCtx(`console.log("daemon started");`, {
+          filePath: "src/daemon/worker.ts",
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+    });
+
+    describe("configurable methods", () => {
+      test("flags console.info when configured via methods", () => {
+        const ctx = makeCtx(`console.info("info message");`, {
+          config: { methods: ["log", "debug", "info"] },
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(1);
+        expect(findings[0].message).toContain("console.info");
+      });
+
+      test("flags console.dir when configured via methods", () => {
+        const ctx = makeCtx(`console.dir({ a: 1 });`, {
+          config: { methods: ["dir"] },
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(1);
+        expect(findings[0].message).toContain("console.dir");
+      });
+
+      test("does NOT flag console.log when not in configured methods", () => {
+        const ctx = makeCtx(`console.log("test");`, {
+          config: { methods: ["debug"] },
+        });
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(0);
+      });
+
+      test("uses defaults when methods config is empty", () => {
+        const ctx = makeCtx(`console.log("test");\nconsole.debug("d");`);
+        const findings = debugConsoleInProd.detect(ctx);
+        expect(findings.length).toBe(2);
+      });
     });
   });
 

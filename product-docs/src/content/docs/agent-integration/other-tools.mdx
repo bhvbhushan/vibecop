@@ -1,0 +1,112 @@
+---
+title: Other Tools
+description: Set up vibecop with Codex CLI, Aider, GitHub Copilot, Windsurf, and Cline
+---
+
+vibecop supports a range of AI coding tools beyond Claude Code and Cursor. This page covers setup for each.
+
+## Tier 1: Deterministic Hooks
+
+### Codex CLI
+
+Codex CLI uses the same `PostToolUse` hook pattern as Claude Code.
+
+Create `.codex/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx vibecop scan --diff HEAD --format agent"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Aider
+
+Aider has a native `lint-cmd` config that runs after each edit. vibecop acts as the linter for TypeScript, JavaScript, and Python files.
+
+Create `.aider.conf.yml`:
+
+```yaml
+lint-cmd:
+  - "typescript: npx vibecop scan --format text"
+  - "javascript: npx vibecop scan --format text"
+  - "python: npx vibecop scan --format text"
+auto-lint: true
+```
+
+Note: Aider uses `--format text` (not `agent`) since it reads linter output differently from streaming agents.
+
+## Tier 2: LLM-Mediated Instructions
+
+These tools do not have deterministic hook execution. vibecop is injected as a persistent instruction into the agent's context. The LLM follows the instruction voluntarily.
+
+### GitHub Copilot
+
+Add to `.github/copilot-instructions.md`:
+
+```markdown
+## vibecop
+
+After every code edit, run `npx vibecop scan --diff HEAD --format agent` and fix any findings before proceeding.
+```
+
+If the file already exists, append the `## vibecop` section. `vibecop init` handles this automatically -- it detects existing content and appends without overwriting.
+
+### Windsurf
+
+Create `.windsurf/rules/vibecop.md`:
+
+```markdown
+---
+trigger: always_on
+---
+
+After every code edit, review vibecop findings and fix issues before proceeding.
+Run: npx vibecop scan --diff HEAD --format agent
+```
+
+### Cline / Roo Code
+
+Create `.clinerules`:
+
+```
+After every code edit, run `npx vibecop scan --diff HEAD --format agent` and fix any findings before proceeding.
+```
+
+## Tier 1 vs Tier 2 Comparison
+
+| Aspect | Tier 1 (Hooks) | Tier 2 (Instructions) |
+|--------|:--------------:|:---------------------:|
+| Execution | Deterministic | LLM-dependent |
+| Blocking | Yes (exit code) | No (voluntary) |
+| Reliability | 100% | ~90% (depends on LLM) |
+| Setup | Config file | Instructions file |
+
+Tier 1 integrations are more reliable because they execute deterministically via hooks. Tier 2 integrations depend on the LLM reading and following the instruction. Both approaches work in practice, but Tier 1 provides stronger guarantees.
+
+## Auto Setup for All Tools
+
+```bash
+npx vibecop init
+```
+
+`vibecop init` detects which tools you have installed and generates the correct config files for each. It checks for:
+
+- `.claude/` directory (Claude Code)
+- `.cursor/` directory (Cursor)
+- `.codex/` directory (Codex CLI)
+- `aider` in PATH (Aider)
+- `.windsurf/` directory (Windsurf)
+- `.github/` directory (GitHub Copilot)
+- `.cline/` directory or `.clinerules` file (Cline)

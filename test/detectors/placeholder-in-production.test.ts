@@ -132,4 +132,123 @@ describe("placeholder-in-production", () => {
       expect(findings.length).toBe(1);
     });
   });
+
+  describe("fixture/example/mock directory skipping", () => {
+    test("does NOT flag placeholder in fixtures/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { domain: "yourdomain.com" };`,
+        { filePath: "test/fixtures/config-data.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in __fixtures__/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { domain: "yourdomain.com" };`,
+        { filePath: "src/__fixtures__/mock-config.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in examples/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { url: "https://example.com/api" };`,
+        { filePath: "examples/basic-setup.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in example/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { key: "your_api_key" };`,
+        { filePath: "example/config.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in samples/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { password: "changeme" };`,
+        { filePath: "samples/auth-config.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in mocks/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { token: "your_token" };`,
+        { filePath: "src/mocks/api-responses.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in stubs/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { domain: "yourdomain.com" };`,
+        { filePath: "test/stubs/config.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in demo/ directory", () => {
+      const ctx = makeCtx(
+        `const config = { password: "changeme" };`,
+        { filePath: "demo/setup.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in .fixture.ts file", () => {
+      const ctx = makeCtx(
+        `const config = { domain: "yourdomain.com" };`,
+        { filePath: "src/config.fixture.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in .example.ts file", () => {
+      const ctx = makeCtx(
+        `const config = { key: "your_api_key" };`,
+        { filePath: "src/config.example.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in .example file", () => {
+      const ctx = makeCtx(
+        `SECRET_KEY="changeme"`,
+        { filePath: ".env.example" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("does NOT flag placeholder in .md file", () => {
+      const ctx = makeCtx(
+        `Set your url to "https://example.com/api"`,
+        { filePath: "docs/setup.md" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("STILL flags placeholder in regular src/ file", () => {
+      const ctx = makeCtx(
+        `const config = { domain: "yourdomain.com" };`,
+        { filePath: "src/config.ts" },
+      );
+      const findings = placeholderInProduction.detect(ctx);
+      expect(findings.length).toBe(1);
+    });
+  });
 });

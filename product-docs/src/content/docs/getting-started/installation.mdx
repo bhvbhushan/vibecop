@@ -1,0 +1,61 @@
+---
+title: Installation
+description: How to install vibecop
+---
+
+## Requirements
+
+- **Node.js >= 20** or **Bun >= 1.0**
+
+## Install Globally
+
+```bash
+# npm
+npm install -g vibecop
+
+# bun (recommended)
+bun add -g vibecop
+```
+
+## Install as Dev Dependency
+
+```bash
+# npm
+npm install --save-dev vibecop
+
+# bun
+bun add -d vibecop
+```
+
+When installed as a dev dependency, use `npx vibecop` to run it. This is the recommended approach for CI pipelines and team projects, since the version is pinned in `package.json`.
+
+## Use Without Installing
+
+```bash
+npx vibecop scan .
+```
+
+This downloads and runs vibecop on demand. Useful for one-off scans or trying it out.
+
+## Verify Installation
+
+```bash
+vibecop --version
+```
+
+You should see the installed version number.
+
+## Platform Support
+
+vibecop uses `@ast-grep/napi` which ships pre-built native binaries for:
+
+- macOS (x64, arm64)
+- Linux (x64, arm64)
+- Windows (x64)
+
+The native binaries are installed automatically as optional dependencies. If your platform is not supported, installation will fail at the native binding step.
+
+## Next Steps
+
+- [Run your first scan](/vibecop/getting-started/quick-start/)
+- [Set up agent integration](/vibecop/agent-integration/overview/)

@@ -1,0 +1,147 @@
+---
+title: MCP Server
+description: Use vibecop as an MCP server for Continue.dev, Amazon Q, Zed, and other MCP-compatible tools
+---
+
+vibecop includes a built-in MCP (Model Context Protocol) server that exposes scan, check, and explain tools over stdio transport. This enables integration with any MCP-compatible AI coding tool.
+
+## Starting the Server
+
+```bash
+vibecop serve
+```
+
+The server starts on stdio (standard input/output) and logs status messages to stderr. It runs until terminated with SIGINT or SIGTERM.
+
+## MCP Client Configuration
+
+Configure your MCP client to connect to vibecop:
+
+```json
+{
+  "mcpServers": {
+    "vibecop": {
+      "command": "npx",
+      "args": ["vibecop", "serve"]
+    }
+  }
+}
+```
+
+## Available Tools
+
+The MCP server exposes three tools:
+
+### vibecop_scan
+
+Scan a directory for AI code quality issues.
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|:--------:|---------|-------------|
+| `path` | string | No | Current working directory | Directory to scan |
+| `maxFindings` | number | No | 50 | Maximum findings to return |
+
+**Response:** JSON object with `findings`, `filesScanned`, and `errors` arrays.
+
+### vibecop_check
+
+Check a single file for AI code quality issues.
+
+**Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|:--------:|---------|-------------|
+| `file_path` | string | Yes | -- | Absolute or relative path to the file |
+| `maxFindings` | number | No | 50 | Maximum findings to return |
+
+**Response:** JSON object with `findings`, `filesScanned`, and `errors` arrays.
+
+### vibecop_explain
+
+Get detailed information about what a specific detector checks for.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `detector_id` | string | Yes | The detector ID (e.g., `unsafe-shell-exec`, `god-function`) |
+
+**Response:** JSON object with `id`, `name`, `description`, `severity`, `category`, and `languages`.
+
+If the detector ID is not found, returns an error with the list of all available detector IDs.
+
+## Tool-Specific Setup
+
+### Continue.dev
+
+Add to `.continue/config.json`:
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "vibecop",
+      "command": "npx",
+      "args": ["vibecop", "serve"]
+    }
+  ]
+}
+```
+
+### Amazon Q
+
+Configure the MCP server in your Amazon Q developer settings:
+
+```json
+{
+  "mcpServers": {
+    "vibecop": {
+      "command": "npx",
+      "args": ["vibecop", "serve"]
+    }
+  }
+}
+```
+
+### Zed
+
+Add to your Zed MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "vibecop": {
+      "command": "npx",
+      "args": ["vibecop", "serve"]
+    }
+  }
+}
+```
+
+## Architecture
+
+The MCP server is built on the `@modelcontextprotocol/sdk` package and uses stdio transport (JSON-RPC over stdin/stdout). It reuses the same `scan()` and `checkFile()` engine functions as the CLI.
+
+```
+MCP Client (Continue.dev / Amazon Q / Zed)
+  ↕ JSON-RPC over stdio
+vibecop MCP Server
+  → vibecop_scan  → engine.scan()
+  → vibecop_check → engine.checkFile()
+  → vibecop_explain → detector metadata lookup
+```
+
+The server handles graceful shutdown on SIGINT and SIGTERM. All logging goes to stderr so it does not interfere with the MCP protocol on stdout.
+
+## When to Use MCP vs Hooks
+
+| Criteria | MCP Server (Tier 3) | Hooks (Tier 1) |
+|----------|:-------------------:|:--------------:|
+| Tool support | Any MCP client | Tool-specific hooks |
+| Invocation | On-demand by agent | Automatic on file edit |
+| Blocking | Agent-controlled | Deterministic (exit code) |
+| Best for | MCP-native tools | Claude Code, Cursor |
+
+Use the MCP server when your tool supports MCP natively (Continue.dev, Amazon Q, Zed). Use hooks when your tool supports them (Claude Code, Cursor, Codex CLI) -- hooks provide stronger guarantees because they execute deterministically.

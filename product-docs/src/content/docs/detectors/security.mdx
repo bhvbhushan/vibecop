@@ -1,0 +1,170 @@
+---
+title: Security Detectors
+description: All 7 security detectors with descriptions and examples
+---
+
+Security detectors identify vulnerabilities that AI agents frequently introduce: SQL injection, unsafe shell execution, dynamic code evaluation, hardcoded credentials, and XSS vectors.
+
+## sql-injection
+
+**Severity:** error
+
+Template literals or string concatenation in SQL query methods.
+
+**What it catches:**
+
+```typescript
+const query = `SELECT * FROM users WHERE id = '${userId}'`;
+await db.query(query);
+```
+
+```typescript
+const result = await db.raw("SELECT * FROM orders WHERE status = '" + status + "'");
+```
+
+**Fix:** Use parameterized queries:
+
+```typescript
+const result = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+```
+
+**Why it matters:** AI agents frequently interpolate user input directly into SQL strings. This is the most common web application vulnerability (OWASP A03).
+
+## dangerous-inner-html
+
+**Severity:** warning
+
+`dangerouslySetInnerHTML` usage without sanitization.
+
+**What it catches:**
+
+```tsx
+<div dangerouslySetInnerHTML={{ __html: userContent }} />
+```
+
+**Fix:** Sanitize the content first:
+
+```tsx
+import DOMPurify from 'dompurify';
+<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userContent) }} />
+```
+
+**Why it matters:** AI agents use `dangerouslySetInnerHTML` to render HTML content without considering XSS risks. Any user-controlled content becomes an injection vector.
+
+## token-in-localstorage
+
+**Severity:** error
+
+Auth/JWT tokens stored in browser `localStorage`, which is accessible to any JavaScript on the page.
+
+**What it catches:**
+
+```typescript
+localStorage.setItem('authToken', token);
+localStorage.setItem('jwt', response.token);
+localStorage.setItem('access_token', data.access_token);
+```
+
+**Fix:** Use `httpOnly` cookies instead:
+
+```typescript
+// Server-side: set the token as an httpOnly cookie
+res.cookie('token', jwt, { httpOnly: true, secure: true, sameSite: 'strict' });
+```
+
+**Why it matters:** `localStorage` is accessible to any JavaScript running on the page, including XSS payloads. AI agents commonly use `localStorage` for token storage because it's the simplest approach.
+
+## placeholder-in-production
+
+**Severity:** error
+
+Placeholder values like `yourdomain.com`, `changeme`, `xxx`, `TODO`, or `example.com` left in configuration code.
+
+**What it catches:**
+
+```typescript
+const config = {
+  domain: 'yourdomain.com',
+  apiKey: 'changeme',
+  secret: 'xxx',
+};
+```
+
+**Why it matters:** AI agents generate code with placeholder values that developers forget to replace. These can expose configuration details or cause silent failures in production.
+
+## insecure-defaults
+
+**Severity:** error
+
+`eval()` usage, `rejectUnauthorized: false` (disabling TLS verification), and hardcoded credentials.
+
+**What it catches:**
+
+```typescript
+// Disabling TLS verification
+const agent = new https.Agent({ rejectUnauthorized: false });
+
+// eval with user input
+eval(userInput);
+
+// Hardcoded credentials
+const password = 'admin123';
+```
+
+**Why it matters:** AI agents reach for the simplest solution: `eval()` for dynamic code, disabled TLS for HTTPS errors, and hardcoded credentials for quick testing. All of these are serious security vulnerabilities.
+
+## unsafe-shell-exec
+
+**Severity:** error
+
+`exec()`, `execSync()`, or `spawn()` with template literals or string concatenation, and Python's `subprocess` with `shell=True`.
+
+**What it catches:**
+
+```typescript
+// JavaScript/TypeScript
+execSync(`git clone ${repoUrl}`);
+exec(`rm -rf ${userPath}`);
+```
+
+```python
+# Python
+subprocess.run(f"git clone {repo_url}", shell=True)
+os.system(f"rm -rf {user_path}")
+```
+
+**Fix:** Use argument arrays:
+
+```typescript
+execFileSync('git', ['clone', repoUrl]);
+```
+
+```python
+subprocess.run(['git', 'clone', repo_url], shell=False)
+```
+
+**Why it matters:** AI coding agents frequently generate shell commands with interpolated variables. If any variable contains user input, this enables arbitrary command execution. This is especially dangerous in agentic workflows where the AI tool has write access to the filesystem. Source: OWASP Agentic Security guidelines.
+
+## dynamic-code-exec
+
+**Severity:** error
+
+`eval(variable)`, `new Function(variable)`, or `Function(variable)` with non-literal arguments.
+
+**What it catches:**
+
+```typescript
+eval(userProvidedCode);
+const fn = new Function(dynamicCode);
+const result = Function('return ' + expression)();
+```
+
+**Fix:** Avoid dynamic code execution entirely. If needed, use a sandboxed VM:
+
+```typescript
+import { VM } from 'vm2';
+const vm = new VM();
+const result = vm.run(sandboxedCode);
+```
+
+**Why it matters:** AI agents use `eval()` and `new Function()` for dynamic behavior (e.g., evaluating user expressions, running generated code). This enables arbitrary code execution if the input is not trusted. Source: OWASP Agentic Security guidelines.

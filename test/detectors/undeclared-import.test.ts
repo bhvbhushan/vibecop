@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { parse, Lang, registerDynamicLanguage } from "@ast-grep/napi";
 import { createRequire } from "node:module";
+import { mkdirSync, writeFileSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { undeclaredImport } from "../../src/detectors/undeclared-import.js";
 import type { DetectionContext, FileInfo, ProjectInfo } from "../../src/types.js";
 
@@ -46,6 +49,7 @@ function makeCtx(
   source: string,
   project: ProjectInfo,
   language: "typescript" | "javascript" | "python" = "typescript",
+  options?: { filePath?: string; absolutePath?: string },
 ): DetectionContext {
   const langMap: Record<string, Lang | string> = {
     typescript: Lang.TypeScript,
@@ -57,10 +61,11 @@ function makeCtx(
     javascript: ".js",
     python: ".py",
   };
+  const defaultRelPath = `src/app.${extMap[language].slice(1)}`;
   const root = parse(langMap[language] as Lang, source);
   const file: FileInfo = {
-    path: `src/app.${extMap[language].slice(1)}`,
-    absolutePath: `/src/app.${extMap[language].slice(1)}`,
+    path: options?.filePath ?? defaultRelPath,
+    absolutePath: options?.absolutePath ?? `/${options?.filePath ?? defaultRelPath}`,
     language,
     extension: extMap[language],
   };
@@ -277,6 +282,97 @@ describe("undeclared-import", () => {
         NO_MANIFEST_PROJECT,
         "python",
       );
+      const findings = undeclaredImport.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+  });
+
+  describe("self-referencing package imports", () => {
+    test("JS/TS: does NOT flag import of own package name", () => {
+      // Create a temp directory with a package.json
+      const tmp = mkdtempSync(join(tmpdir(), "vibecop-test-"));
+      const srcDir = join(tmp, "src");
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(join(tmp, "package.json"), JSON.stringify({
+        name: "my-cool-package",
+        dependencies: {},
+      }));
+
+      const project: ProjectInfo = {
+        dependencies: new Set(),
+        devDependencies: new Set(),
+        manifests: ["package.json"],
+      };
+
+      const source = `import { helper } from 'my-cool-package';`;
+      const root = parse(Lang.TypeScript, source);
+      const file: FileInfo = {
+        path: "src/utils.ts",
+        absolutePath: join(tmp, "src/utils.ts"),
+        language: "typescript",
+        extension: ".ts",
+      };
+      const ctx: DetectionContext = { file, root, source, project, config: {} };
+      const findings = undeclaredImport.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("JS/TS: does NOT flag require() of own package name", () => {
+      const tmp = mkdtempSync(join(tmpdir(), "vibecop-test-"));
+      const srcDir = join(tmp, "src");
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(join(tmp, "package.json"), JSON.stringify({
+        name: "@my-org/my-lib",
+        dependencies: {},
+      }));
+
+      const project: ProjectInfo = {
+        dependencies: new Set(),
+        devDependencies: new Set(),
+        manifests: ["package.json"],
+      };
+
+      const source = `const lib = require('@my-org/my-lib');`;
+      const root = parse(Lang.TypeScript, source);
+      const file: FileInfo = {
+        path: "src/index.ts",
+        absolutePath: join(tmp, "src/index.ts"),
+        language: "typescript",
+        extension: ".ts",
+      };
+      const ctx: DetectionContext = { file, root, source, project, config: {} };
+      const findings = undeclaredImport.detect(ctx);
+      expect(findings.length).toBe(0);
+    });
+
+    test("Python: does NOT flag import of own package with hyphens", () => {
+      // Create a temp directory simulating mcp-atlassian project
+      const tmp = mkdtempSync(join(tmpdir(), "vibecop-test-"));
+      const srcDir = join(tmp, "src");
+      const pkgDir = join(tmp, "src", "mcp_atlassian");
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(join(pkgDir, "__init__.py"), "");
+      writeFileSync(join(tmp, "pyproject.toml"), [
+        "[project]",
+        'name = "mcp-atlassian"',
+        "dependencies = []",
+      ].join("\n"));
+
+      const project: ProjectInfo = {
+        dependencies: new Set(),
+        devDependencies: new Set(),
+        manifests: ["pyproject.toml"],
+      };
+
+      const source = `import mcp_atlassian\n`;
+      const root = parse("python" as Lang, source);
+      const file: FileInfo = {
+        path: "src/app.py",
+        absolutePath: join(tmp, "src/app.py"),
+        language: "python",
+        extension: ".py",
+      };
+      const ctx: DetectionContext = { file, root, source, project, config: {} };
       const findings = undeclaredImport.detect(ctx);
       expect(findings.length).toBe(0);
     });

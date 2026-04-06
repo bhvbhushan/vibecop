@@ -102,3 +102,25 @@ export interface TimingInfo {
   totalMs: number;
   perDetector: Record<string, number>;
 }
+
+/** Options for the scan() engine function */
+export interface EngineScanOptions {
+  /** Directory to scan (defaults to ".") */
+  scanPath?: string;
+  /** Path to config file, or false to disable config loading */
+  config?: string | false;
+  /** Maximum number of findings to report (default 50, 0 = unlimited) */
+  maxFindings?: number;
+  /** Show timing information */
+  verbose?: boolean;
+  /** Explicit file paths to scan (skips file discovery when provided) */
+  files?: string[];
+}
+
+/** Options for the checkFile() engine function */
+export interface CheckFileOptions {
+  /** Maximum number of findings to report (default 50, 0 = unlimited) */
+  maxFindings?: number;
+  /** Show timing information */
+  verbose?: boolean;
+}

@@ -27,6 +27,11 @@ Thumbs.db
 # Test coverage
 coverage/
 
+# Documentation site build artifacts
+product-docs/node_modules/
+product-docs/dist/
+product-docs/.astro/
+
 **/CLAUDE.md
 
 docs/*

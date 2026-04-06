@@ -1,0 +1,202 @@
+---
+title: Config File
+description: Full .vibecop.yml configuration reference
+---
+
+vibecop is configured via a `.vibecop.yml` file in your project root. The config file is optional -- vibecop runs with safe defaults if no config is present.
+
+## Loading Behavior
+
+1. vibecop looks for `.vibecop.yml` in the current working directory
+2. If not found, defaults are used (all detectors enabled, standard ignore patterns)
+3. Use `--config <path>` to specify a different config file
+4. Use `--no-config` to skip config loading entirely
+
+## Full Reference
+
+```yaml
+# Per-rule configuration
+rules:
+  god-function:
+    severity: warning        # override default severity
+  debug-console-in-prod:
+    severity: "off"          # disable this detector entirely
+  excessive-any:
+    severity: warning
+  excessive-comment-ratio:
+    threshold: 0.5           # custom threshold (50% comment lines)
+
+# File/directory ignore patterns (glob syntax)
+ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/.next/**"
+  - "**/docs/**"
+  - "**/vendor/**"
+  - "**/*.min.js"
+  - "**/*.d.ts"
+
+# PR gate configuration (used by GitHub Action)
+pr-gate:
+  on-failure: request-changes    # comment-only | request-changes | label | auto-close
+  severity-threshold: warning    # error | warning | info
+  max-findings: 50               # 0 = unlimited
+  label: "vibecop:needs-review"  # label to apply when on-failure is "label"
+
+# Custom rules directory
+custom-rules-dir: .vibecop/rules
+```
+
+## Rules Section
+
+The `rules` section configures individual detectors. Each key is a detector ID.
+
+### Setting Severity
+
+Override the default severity for any detector:
+
+```yaml
+rules:
+  god-function:
+    severity: error      # escalate to error
+  todo-in-production:
+    severity: warning    # escalate from info
+  debug-console-in-prod:
+    severity: info       # downgrade to info
+```
+
+Valid severity values: `error`, `warning`, `info`, `off`.
+
+### Disabling a Detector
+
+Set the severity to `off`:
+
+```yaml
+rules:
+  excessive-comment-ratio:
+    severity: "off"
+  over-defensive-coding:
+    severity: "off"
+```
+
+### Custom Thresholds
+
+Some detectors support additional configuration:
+
+```yaml
+rules:
+  excessive-comment-ratio:
+    threshold: 0.6       # 60% comment lines (default: 0.5)
+```
+
+## Ignore Section
+
+The `ignore` section specifies glob patterns for files and directories to skip during scanning. When specified, user patterns **replace** the defaults entirely.
+
+### Default Ignore Patterns
+
+If no `ignore` section is provided, these patterns are used:
+
+```yaml
+ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/.next/**"
+  - "**/docs/**"
+  - "**/vendor/**"
+  - "**/*.min.js"
+  - "**/*.d.ts"
+```
+
+### Custom Ignore Patterns
+
+```yaml
+ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/generated/**"
+  - "**/*.test.ts"         # skip test files
+  - "src/legacy/**"        # skip legacy code
+```
+
+Note: When you specify `ignore`, the defaults are **replaced**, not merged. Include any default patterns you want to keep.
+
+## PR Gate Section
+
+The `pr-gate` section configures behavior for the GitHub Action. See [GitHub Action](/vibecop/github-action/) for full details.
+
+```yaml
+pr-gate:
+  on-failure: comment-only       # what to do when findings are detected
+  severity-threshold: warning    # minimum severity to report
+  max-findings: 50               # cap on findings per PR
+  label: "vibecop:needs-review"  # label for on-failure: label mode
+```
+
+### on-failure Options
+
+| Value | Behavior |
+|-------|----------|
+| `comment-only` | Post inline comments on findings (default) |
+| `request-changes` | Post comments and request changes on the PR |
+| `label` | Apply a label to the PR |
+| `auto-close` | Close the PR (opt-in, use carefully) |
+
+## Custom Rules Directory
+
+Point to a directory containing custom YAML rules:
+
+```yaml
+custom-rules-dir: .vibecop/rules
+```
+
+See [Custom Rules](/vibecop/configuration/custom-rules/) for the YAML rule format.
+
+## Validation
+
+The config file is validated with Zod at startup. Invalid configs produce clear error messages:
+
+```
+Invalid config in .vibecop.yml:
+  - rules.god-function.severity: Invalid enum value. Expected 'error' | 'warning' | 'info' | 'off', received 'critical'
+```
+
+## Examples
+
+### Minimal Config
+
+```yaml
+rules:
+  debug-console-in-prod:
+    severity: "off"
+```
+
+### Strict Config
+
+```yaml
+rules:
+  god-function:
+    severity: error
+  excessive-any:
+    severity: error
+  todo-in-production:
+    severity: warning
+
+ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+```
+
+### Library Config
+
+For libraries that deliberately use `any` (like Zod):
+
+```yaml
+rules:
+  excessive-any:
+    severity: "off"
+  double-type-assertion:
+    severity: "off"
+```

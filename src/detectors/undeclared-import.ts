@@ -298,9 +298,40 @@ function findPyProjectRoot(fileDir: string, scanRoot: string): string {
   return result;
 }
 
+/** Normalize a Python package name: hyphens become underscores */
+function normalizePyName(name: string): string {
+  return name.replace(/-/g, "_");
+}
+
+/** Read the [project] name field from pyproject.toml, if present */
+function readPyprojectName(projectRoot: string): string | null {
+  const tomlPath = join(projectRoot, "pyproject.toml");
+  try {
+    if (!existsSync(tomlPath)) return null;
+    const raw = readFileSync(tomlPath, "utf-8");
+    const lines = raw.split("\n");
+    let inProject = false;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("[")) {
+        inProject = trimmed === "[project]";
+        continue;
+      }
+      if (inProject) {
+        const m = trimmed.match(/^name\s*=\s*"([^"]+)"/);
+        if (m?.[1]) return m[1];
+      }
+    }
+  } catch {
+    // skip
+  }
+  return null;
+}
+
 /**
  * Find local Python packages at a given project root.
  * Checks for directories with __init__.py and standalone .py files.
+ * Also reads pyproject.toml [project] name and normalizes hyphens.
  * Results cached per project root.
  */
 function findLocalPyPackages(filePath: string, scanRoot: string): Set<string> {
@@ -329,7 +360,17 @@ function findLocalPyPackages(filePath: string, scanRoot: string): Set<string> {
     // Not readable
   }
 
-  locals.add(basename(projectRoot));
+  // Add project root basename (normalized: hyphens -> underscores)
+  const rootName = basename(projectRoot);
+  locals.add(rootName);
+  locals.add(normalizePyName(rootName));
+
+  // Read pyproject.toml [project] name and add it (normalized)
+  const pyprojectName = readPyprojectName(projectRoot);
+  if (pyprojectName) {
+    locals.add(pyprojectName);
+    locals.add(normalizePyName(pyprojectName));
+  }
 
   localPackageCache.set(projectRoot, locals);
   return locals;
@@ -359,8 +400,47 @@ function isPythonImportDeclared(topLevel: string, ctx: DetectionContext, scanRoo
   return false;
 }
 
-function isDeclaredJs(packageName: string, ctx: DetectionContext): boolean {
-  return ctx.project.dependencies.has(packageName) || ctx.project.devDependencies.has(packageName);
+/** Cache for project name lookups from package.json */
+const projectNameCache = new Map<string, string | null>();
+
+/** Read the "name" field from the nearest package.json */
+function getJsProjectName(filePath: string, scanRoot: string): string | null {
+  let dir = dirname(filePath);
+  if (projectNameCache.has(dir)) {
+    return projectNameCache.get(dir)!;
+  }
+
+  let result: string | null = null;
+  while (dir.length >= scanRoot.length) {
+    const pkgPath = join(dir, "package.json");
+    try {
+      if (existsSync(pkgPath)) {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+        if (typeof pkg.name === "string" && pkg.name) {
+          result = pkg.name;
+        }
+        break;
+      }
+    } catch {
+      // skip
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  projectNameCache.set(dir, result);
+  return result;
+}
+
+function isDeclaredJs(packageName: string, ctx: DetectionContext, scanRoot: string): boolean {
+  if (ctx.project.dependencies.has(packageName) || ctx.project.devDependencies.has(packageName)) {
+    return true;
+  }
+  // A package importing itself is not undeclared
+  const projectName = getJsProjectName(ctx.file.absolutePath, scanRoot);
+  if (projectName && packageName === projectName) return true;
+  return false;
 }
 
 function getScanRoot(ctx: DetectionContext): string {
@@ -396,7 +476,7 @@ function detectJavaScriptUndeclaredImports(ctx: DetectionContext): Finding[] {
 
     const packageName = extractJsPackageName(specifier);
     if (!packageName) continue;
-    if (isDeclaredJs(packageName, ctx)) continue;
+    if (isDeclaredJs(packageName, ctx, scanRoot)) continue;
 
     // Check nearest package.json in monorepo setups
     const nearestDeps = findNearestJsDependencies(ctx.file.absolutePath, scanRoot);
@@ -440,7 +520,7 @@ function detectJavaScriptUndeclaredImports(ctx: DetectionContext): Finding[] {
 
     const packageName = extractJsPackageName(specifier);
     if (!packageName) continue;
-    if (isDeclaredJs(packageName, ctx)) continue;
+    if (isDeclaredJs(packageName, ctx, scanRoot)) continue;
 
     // Check nearest package.json in monorepo setups
     const nearestDeps = findNearestJsDependencies(ctx.file.absolutePath, scanRoot);

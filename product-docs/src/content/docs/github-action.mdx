@@ -1,0 +1,182 @@
+---
+title: GitHub Action
+description: Use vibecop as a PR gate with inline review comments
+---
+
+vibecop ships a GitHub Action that scans pull requests and posts inline review comments on changed lines. Use it as a PR quality gate to catch AI-generated code issues before they merge.
+
+## Quick Setup
+
+Add to `.github/workflows/vibecop.yml`:
+
+```yaml
+name: vibecop
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bhvbhushan/vibecop@main
+        with:
+          on-failure: comment-only
+          severity-threshold: warning
+          max-findings: 50
+```
+
+## Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `github-token` | GitHub token for API access | `${{ github.token }}` |
+| `config` | Path to `.vibecop.yml` config file | `.vibecop.yml` |
+| `on-failure` | Action on findings: `comment-only`, `request-changes`, `label`, `auto-close` | `comment-only` |
+| `label` | Label to apply when `on-failure` is `label` | `vibecop:needs-review` |
+| `max-findings` | Maximum findings to report (0 = unlimited) | `50` |
+| `severity-threshold` | Minimum severity for inline comments: `error`, `warning`, `info` | `warning` |
+| `working-directory` | Directory to scan (relative to repo root) | `.` |
+
+## Outputs
+
+| Output | Description |
+|--------|-------------|
+| `findings-count` | Total number of findings |
+| `errors-count` | Number of error-severity findings |
+| `warnings-count` | Number of warning-severity findings |
+| `has-findings` | Whether any findings were detected (`true`/`false`) |
+| `scan-time-ms` | Scan duration in milliseconds |
+
+## on-failure Modes
+
+### comment-only (default)
+
+Posts inline review comments on the affected lines. The PR is not blocked -- maintainers review the findings alongside the code.
+
+```yaml
+with:
+  on-failure: comment-only
+```
+
+### request-changes
+
+Posts inline comments and marks the review as "Request Changes". The PR cannot be merged until the review is dismissed or resolved.
+
+```yaml
+with:
+  on-failure: request-changes
+```
+
+### label
+
+Applies a label to the PR. Useful for triaging PRs that need additional review.
+
+```yaml
+with:
+  on-failure: label
+  label: "vibecop:needs-review"
+```
+
+### auto-close
+
+Closes the PR automatically. Use with caution -- primarily for OSS repositories that want to auto-reject PRs with critical findings.
+
+```yaml
+with:
+  on-failure: auto-close
+```
+
+## Severity Threshold
+
+Control which findings generate inline comments:
+
+```yaml
+with:
+  severity-threshold: error    # only errors
+  severity-threshold: warning  # errors + warnings (default)
+  severity-threshold: info     # everything
+```
+
+## Configuration
+
+The GitHub Action reads `.vibecop.yml` from your repository. The `pr-gate` section in the config file provides additional control:
+
+```yaml
+# .vibecop.yml
+pr-gate:
+  on-failure: request-changes
+  severity-threshold: warning
+  max-findings: 50
+  label: "vibecop:needs-review"
+```
+
+Action inputs override config file settings when both are specified.
+
+## How It Works
+
+1. The action checks out the PR branch
+2. It runs `vibecop scan` with `--diff` mode to scan only changed files
+3. Findings are filtered to only lines that were modified in the PR
+4. Inline review comments are posted on the affected lines
+5. A summary comment is posted with the total finding count
+6. The action sets outputs and exits
+
+The diff-only approach keeps scan times fast (typically under 60 seconds) regardless of repository size.
+
+## Examples
+
+### Strict Gate for OSS Projects
+
+```yaml
+name: vibecop
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bhvbhushan/vibecop@main
+        with:
+          on-failure: request-changes
+          severity-threshold: warning
+          max-findings: 100
+```
+
+### Soft Gate with Labels
+
+```yaml
+name: vibecop
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bhvbhushan/vibecop@main
+        id: vibecop
+        with:
+          on-failure: label
+          label: "needs-quality-review"
+      - name: Report
+        if: steps.vibecop.outputs.has-findings == 'true'
+        run: echo "Found ${{ steps.vibecop.outputs.findings-count }} issues"
+```
+
+### Scan Specific Directory
+
+```yaml
+name: vibecop
+on: [pull_request]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bhvbhushan/vibecop@main
+        with:
+          working-directory: src/
+          severity-threshold: error
+```

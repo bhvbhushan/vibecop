@@ -1,0 +1,82 @@
+---
+title: Cursor
+description: Set up vibecop as an afterFileEdit hook in Cursor
+---
+
+Cursor supports `afterFileEdit` hooks and rules files. vibecop uses both for a two-layer integration: the hook runs the scan, and the rules file reinforces the fix behavior.
+
+## Auto Setup
+
+```bash
+npx vibecop init
+```
+
+If a `.cursor/` directory is detected, `vibecop init` generates both the hooks file and the rules file.
+
+## Manual Setup
+
+### Step 1: Create the Hook
+
+Create `.cursor/hooks.json` in your project root:
+
+```json
+{
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "npx vibecop scan --diff HEAD --format agent"
+      }
+    ]
+  }
+}
+```
+
+### Step 2: Create the Rules File
+
+Create `.cursor/rules/vibecop.md`:
+
+```markdown
+---
+trigger: always_on
+---
+
+After every code edit, review vibecop findings and fix issues before proceeding.
+Run: npx vibecop scan --diff HEAD --format agent
+```
+
+### How It Works
+
+1. Cursor edits a file
+2. The `afterFileEdit` hook fires and runs `npx vibecop scan --diff HEAD --format agent`
+3. vibecop scans only the changed files
+4. If findings are detected, the agent reads the output
+5. The rules file reinforces the instruction to fix findings before continuing
+6. The agent corrects the code, and the hook runs again
+
+### Why Both Hook and Rules?
+
+The hook provides deterministic execution -- vibecop runs automatically after every edit. The rules file provides LLM-level reinforcement, ensuring the agent understands it must fix findings rather than ignore them. Together, they form a reliable feedback loop.
+
+## Troubleshooting
+
+### Hook timeout
+
+If Cursor has a timeout for hooks, vibecop should complete within a few seconds on most codebases. For large repos, scope the scan:
+
+```bash
+npx vibecop scan --diff HEAD --format agent --path src/
+```
+
+### Permission issues
+
+On some systems, `npx` may not be in the PATH when hooks execute. Use the full path:
+
+```bash
+$(npm root -g)/.bin/vibecop scan --diff HEAD --format agent
+```
+
+Or use the local installation:
+
+```bash
+node_modules/.bin/vibecop scan --diff HEAD --format agent
+```

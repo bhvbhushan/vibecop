@@ -1,0 +1,67 @@
+---
+title: Introduction
+description: What vibecop is and the problem it solves
+---
+
+## What is vibecop?
+
+vibecop is an open-source code quality toolkit purpose-built for the AI coding era. It ships 35 detectors that catch the bugs AI agents introduce: god functions, N+1 queries, unsafe shell execution, unpinned LLM models, hallucinated packages, and more.
+
+Built on [ast-grep](https://ast-grep.github.io/) for fast, tree-sitter-based AST analysis. No LLM required -- every finding is deterministic and reproducible.
+
+## The Problem
+
+AI-generated code has specific quality issues that traditional linters miss:
+
+- **1.7x more issues per PR** than human code (CodeRabbit, 470 PRs)
+- **4x maintenance costs** by year 2 for unmanaged AI code
+- **19.7% of AI-suggested packages** are hallucinations (USENIX Security 2025)
+- **90%+ of AI code issues** are code smells
+- OSS maintainers are drowning in AI slop PRs (Curl, Jazzband, Godot, tldraw affected)
+
+vibecop addresses these gaps:
+
+1. **AI Slop Defense** -- PR quality gate for OSS maintainers
+2. **AI Code Debt Scanner** -- codebase scanner for AI-generated tech debt
+3. **AI Test Quality Evaluator** -- meaningful coverage scoring for AI-generated tests
+
+## Three Pillars
+
+### 1. Linting
+
+35 detectors across 4 categories (quality, security, correctness, testing) scan your code for AI-specific antipatterns. Run as a CLI tool or in CI.
+
+### 2. Agent Integration
+
+vibecop runs automatically inside your AI coding agent. Every time the agent edits a file, vibecop scans the change and blocks on findings -- the agent reads the output and fixes the issue before proceeding. Supports Claude Code, Cursor, Codex, Aider, GitHub Copilot, Windsurf, and Cline.
+
+### 3. MCP Server
+
+For MCP-compatible tools like Continue.dev, Amazon Q, and Zed, vibecop exposes three tools via the Model Context Protocol: `vibecop_scan`, `vibecop_check`, and `vibecop_explain`.
+
+## Supported Languages
+
+| Language | Extensions | Detectors |
+|----------|-----------|-----------|
+| TypeScript | `.ts`, `.tsx` | All 28 |
+| JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` | 24 (excludes TS-specific) |
+| Python | `.py` | 14 (correctness, quality, security) |
+
+Language is auto-detected from file extension. Parser: `@ast-grep/napi` with `@ast-grep/lang-python` for Python support.
+
+## What vibecop is NOT
+
+- **Not an AI authorship detector** -- it detects quality patterns, not who wrote the code
+- **Not an LLM-based reviewer** -- deterministic, reproducible, free, zero API keys
+- **Not a replacement for SonarQube/ESLint** -- it complements them with AI-specific detectors
+- **Not a code generation tool** -- it reviews code, it does not write it
+
+## Try it Online
+
+**[Playground](https://vibecop-pg.bhvbhushan7.com/)** -- paste code and scan instantly in your browser.
+
+## Next Steps
+
+- [Install vibecop](/vibecop/getting-started/installation/)
+- [Run your first scan](/vibecop/getting-started/quick-start/)
+- [Set up agent integration](/vibecop/agent-integration/overview/)

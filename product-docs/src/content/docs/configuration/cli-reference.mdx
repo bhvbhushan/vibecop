@@ -1,0 +1,188 @@
+---
+title: CLI Reference
+description: All vibecop commands and options
+---
+
+## Commands
+
+### vibecop scan
+
+Scan a directory for code quality issues.
+
+```bash
+vibecop scan [path]
+```
+
+**Arguments:**
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `[path]` | Directory to scan | `.` (current directory) |
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-f, --format <format>` | Output format: `text`, `json`, `github`, `sarif`, `html`, `agent`, `gcc` | `text` |
+| `-c, --config <path>` | Path to config file | `.vibecop.yml` |
+| `--no-config` | Disable config file loading | |
+| `--max-findings <number>` | Maximum number of findings to report | `50` |
+| `--verbose` | Show timing information | `false` |
+| `--diff <ref>` | Scan only files changed vs git ref | |
+| `--stdin-files` | Read file list from stdin (one path per line) | `false` |
+| `--group-by <mode>` | Group findings by `file` or `rule` | `file` |
+
+**Examples:**
+
+```bash
+# Scan current directory
+vibecop scan .
+
+# Scan with JSON output
+vibecop scan src/ --format json
+
+# Scan only changed files
+vibecop scan --diff HEAD
+
+# Scan with custom config
+vibecop scan . --config .vibecop.yml
+
+# Unlimited findings with timing info
+vibecop scan . --max-findings 0 --verbose
+
+# Read file list from stdin
+git diff --name-only HEAD | vibecop scan --stdin-files
+
+# Group findings by rule instead of file
+vibecop scan . --group-by rule
+```
+
+### vibecop check
+
+Check a single file for code quality issues.
+
+```bash
+vibecop check <file>
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `<file>` | File to check (required) |
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-f, --format <format>` | Output format: `text`, `json`, `github`, `sarif`, `html`, `agent`, `gcc` | `text` |
+| `--max-findings <number>` | Maximum number of findings to report | `50` |
+| `--verbose` | Show timing information | `false` |
+| `--group-by <mode>` | Group findings by `file` or `rule` | `file` |
+
+**Examples:**
+
+```bash
+# Check a single file
+vibecop check src/utils/api.ts
+
+# Check with JSON output
+vibecop check src/auth.ts --format json
+```
+
+### vibecop init
+
+Auto-detect AI coding tools and generate integration config files.
+
+```bash
+vibecop init
+```
+
+No arguments or options. Detects tools by checking for:
+
+- `.claude/` directory (Claude Code)
+- `.cursor/` directory (Cursor)
+- `.codex/` directory (Codex CLI)
+- `aider` in PATH (Aider)
+- `.windsurf/` directory (Windsurf)
+- `.github/` directory (GitHub Copilot)
+- `.cline/` or `.clinerules` (Cline/Roo Code)
+
+Generates the appropriate config files for each detected tool. See [Agent Integration](/vibecop/agent-integration/overview/) for details.
+
+### vibecop serve
+
+Start the MCP server on stdio transport.
+
+```bash
+vibecop serve
+```
+
+No arguments or options. The server exposes three tools (`vibecop_scan`, `vibecop_check`, `vibecop_explain`) via the Model Context Protocol. See [MCP Server](/vibecop/agent-integration/mcp-server/) for client configuration.
+
+### vibecop test-rules
+
+Validate custom YAML rules against their inline examples.
+
+```bash
+vibecop test-rules [--rules-dir <path>]
+```
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--rules-dir <path>` | Path to custom rules directory | `.vibecop/rules` |
+
+**Examples:**
+
+```bash
+# Test rules in default directory
+vibecop test-rules
+
+# Test rules in custom directory
+vibecop test-rules --rules-dir my-rules/
+```
+
+Exits with code 1 if any rules fail validation or example testing.
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | No findings (clean) |
+| `1` | One or more findings found |
+| `2` | Scan error (bad arguments, file not found, git error, etc.) |
+
+## Output Formats
+
+| Format | Description |
+|--------|-------------|
+| `text` | Default. Stylish terminal output grouped by file, with colors |
+| `json` | Structured JSON with `findings`, `filesScanned`, `errors`, and optional `timing` |
+| `github` | GitHub Actions `::error` annotations + `GITHUB_STEP_SUMMARY` markdown |
+| `sarif` | SARIF 2.1.0 format for GitHub Security tab upload |
+| `html` | Self-contained single-file HTML report |
+| `agent` | Token-efficient one-finding-per-line format for AI agent hooks |
+| `gcc` | GCC-style `file:line:col: severity: message [rule-id]` for editor integration |
+
+### Agent Format Example
+
+```
+src/api.ts:42:1 error unsafe-shell-exec: execSync() with template literal. Use execFile() with argument array instead.
+src/llm.ts:18:5 warning llm-unpinned-model: Unpinned model alias "gpt-4o". Pin to a dated version like "gpt-4o-2024-08-06".
+```
+
+### GCC Format Example
+
+```
+src/api.ts:42:1: error: execSync() with template literal [unsafe-shell-exec]
+src/llm.ts:18:5: warning: Unpinned model alias "gpt-4o" [llm-unpinned-model]
+```
+
+## Global Options
+
+| Flag | Description |
+|------|-------------|
+| `--version` | Print version number |
+| `--help` | Print help text |

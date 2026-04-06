@@ -1,0 +1,110 @@
+---
+title: Agent Integration Overview
+description: How vibecop integrates with AI coding agents across three tiers
+---
+
+vibecop integrates with AI coding agents as an automatic linter that runs after every code edit. The agent reads findings from stdout and self-corrects before proceeding.
+
+## Quick Setup
+
+Run the setup wizard to auto-detect your tools and generate config files:
+
+```bash
+npx vibecop init
+```
+
+This detects installed/active tools and writes the appropriate config files:
+
+```
+  vibecop — agent integration setup
+
+  Detected tools:
+    ✓ Claude Code (.claude/ directory found)
+    ✓ Cursor (.cursor/ directory found)
+    ✓ Aider (aider installed)
+    ✗ Codex CLI (not found)
+
+  Generated:
+    .claude/settings.json     — PostToolUse hook (blocks on findings)
+    .cursor/hooks.json        — afterFileEdit hook
+    .cursor/rules/vibecop.md  — always-on lint rule
+    .aider.conf.yml           — lint-cmd per language
+
+  Done! vibecop will now run automatically in your agent workflow.
+```
+
+## The Three Tiers
+
+vibecop supports 10+ AI coding tools across three integration tiers:
+
+### Tier 1 -- Deterministic Hooks
+
+These tools support native hook execution. vibecop runs synchronously after each edit and blocks the agent until findings are resolved.
+
+| Tool | Hook Type | Behavior |
+|------|-----------|----------|
+| **Claude Code** | `PostToolUse` | Fires after Edit/Write/MultiEdit, exit 1 blocks |
+| **Cursor** | `afterFileEdit` + rules | Hook runs scan, rules file reinforces fix behavior |
+| **Codex CLI** | `PostToolUse` | Same pattern as Claude Code |
+| **Aider** | Native `--lint-cmd` | Built-in lint integration, runs after every edit |
+
+### Tier 2 -- LLM-Mediated Instructions
+
+These tools do not have deterministic hook execution. Instead, vibecop is injected as a persistent instruction into the agent's context. The LLM follows the instruction voluntarily.
+
+| Tool | Integration |
+|------|-------------|
+| **GitHub Copilot** | Custom instructions file |
+| **Windsurf** | Rules file with `trigger: always_on` |
+| **Cline/Roo Code** | `.clinerules` file |
+
+### Tier 3 -- MCP Server
+
+These tools connect to vibecop via the Model Context Protocol. The agent calls vibecop tools directly through the MCP interface.
+
+| Tool | Integration |
+|------|-------------|
+| **Continue.dev** | MCP server config |
+| **Amazon Q** | MCP server support |
+| **Zed** | MCP settings |
+
+## How the Loop Works
+
+```
+Agent writes code
+  → vibecop hook fires automatically
+  → Findings? Exit 1 → agent reads output, fixes code
+  → No findings? Exit 0 → agent continues
+```
+
+This creates a tight feedback loop: the agent never moves on while there are unresolved findings.
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | No findings -- clean |
+| `1` | One or more findings found |
+| `2` | Scan error (bad args, git error, etc.) |
+
+## Output Format for Agents
+
+The `--format agent` output is token-efficient (one finding per line, ~30 tokens each):
+
+```
+file:line:col severity detector-id: message. suggestion
+```
+
+Example:
+
+```
+src/api.ts:42:1 error unsafe-shell-exec: execSync() with template literal. Use execFile() with argument array instead.
+src/llm.ts:18:5 warning llm-unpinned-model: Unpinned model alias "gpt-4o". Pin to a dated version like "gpt-4o-2024-08-06".
+```
+
+## Tool-Specific Setup
+
+- [Claude Code](/vibecop/agent-integration/claude-code/)
+- [Cursor](/vibecop/agent-integration/cursor/)
+- [Other Tools](/vibecop/agent-integration/other-tools/) (Codex, Aider, Copilot, Windsurf, Cline)
+- [MCP Server](/vibecop/agent-integration/mcp-server/) (Continue.dev, Amazon Q, Zed)

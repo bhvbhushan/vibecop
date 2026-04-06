@@ -1,0 +1,105 @@
+---
+title: Correctness Detectors
+description: All 4 correctness detectors with descriptions and examples
+---
+
+Correctness detectors identify bugs that cause runtime failures: undeclared imports, unchecked database results, mixed concerns, and hallucinated packages.
+
+## unchecked-db-result
+
+**Severity:** warning
+
+Fire-and-forget database mutations (insert, update, delete) where the result is not checked.
+
+**What it catches:**
+
+```typescript
+await prisma.user.update({
+  where: { id: userId },
+  data: { name: newName },
+});
+// result is not captured or checked
+```
+
+**Fix:** Check the result:
+
+```typescript
+const updated = await prisma.user.update({
+  where: { id: userId },
+  data: { name: newName },
+});
+if (!updated) {
+  throw new Error('User not found');
+}
+```
+
+**Why it matters:** AI agents generate database mutations without checking whether they succeeded. A failed update or delete silently does nothing, leading to data inconsistency.
+
+## undeclared-import
+
+**Severity:** error
+
+Imports that are not declared in `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `requirements.txt`, or `pyproject.toml`.
+
+**What it catches:**
+
+```typescript
+import { z } from 'zod';         // if 'zod' is not in package.json
+import express from 'express';    // if 'express' is not in package.json
+```
+
+```python
+import pandas  # if 'pandas' is not in requirements.txt
+```
+
+**How it works:** vibecop parses `package.json` dependencies, lock files, and Python manifest files at startup. For each import statement, it checks whether the package is declared. Zero network calls -- everything is local.
+
+**Why it matters:** AI agents hallucinate package names or import packages that are not installed. This causes runtime `MODULE_NOT_FOUND` errors that only surface when the code actually runs.
+
+**Note:** Built-in modules (like `fs`, `path`, `os` in Node.js, or `json`, `sys` in Python) are automatically excluded.
+
+## mixed-concerns
+
+**Severity:** warning
+
+Files that import both UI frameworks (React, Vue, Svelte) and database/server libraries (Prisma, Mongoose, pg, Express).
+
+**What it catches:**
+
+```typescript
+import React from 'react';
+import { PrismaClient } from '@prisma/client';
+
+function UserPage() {
+  const prisma = new PrismaClient();
+  const users = await prisma.user.findMany();
+  return <div>{users.map(u => <span>{u.name}</span>)}</div>;
+}
+```
+
+**Why it matters:** AI agents often put database queries directly inside React components, violating the separation between UI and data access layers. This makes code untestable and creates tight coupling.
+
+## hallucinated-package
+
+**Severity:** info
+
+Dependencies in `package.json` that are not in the bundled top-5K npm packages allowlist.
+
+**What it catches:**
+
+```json
+{
+  "dependencies": {
+    "react": "^18.0.0",
+    "super-fast-validator": "^1.0.0"
+  }
+}
+```
+
+If `super-fast-validator` is not in the top-5K npm packages, vibecop flags it as a potential hallucination.
+
+**How it works:** vibecop ships a bundled allowlist (`src/data/known-packages.json`) derived from npm's most popular packages. Packages not on the list get flagged. Zero network calls.
+
+**Why it matters:** Research shows 19.7% of AI-suggested packages are hallucinations (USENIX Security 2025). These non-existent packages can be typosquatted by attackers who publish malicious packages with the hallucinated names ("slopsquatting").
+
+**Note:** This detector has a high false-positive rate by design -- legitimate but less-popular packages will also be flagged. Use `.vibecop.yml` to suppress findings for known-good packages.

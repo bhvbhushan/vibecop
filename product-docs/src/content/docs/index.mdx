@@ -1,0 +1,70 @@
+---
+title: vibecop Documentation
+description: AI code quality toolkit — deterministic linter for the AI coding era
+template: splash
+hero:
+  tagline: 35 detectors catch the bugs AI agents introduce. Deterministic, fast, zero LLM required.
+  actions:
+    - text: Get Started
+      link: /vibecop/getting-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/bhvbhushan/vibecop
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why vibecop?
+
+AI coding agents produce code fast, but they also introduce patterns that traditional linters miss: god functions, N+1 queries, unsafe shell execution, unpinned LLM models, hallucinated packages, and trivial test assertions. vibecop catches these problems deterministically, with zero LLM calls.
+
+<CardGrid>
+  <Card title="35 Detectors" icon="magnifier">
+    Quality, security, correctness, and testing detectors purpose-built for AI-generated code patterns.
+  </Card>
+  <Card title="Agent Integration" icon="puzzle">
+    Runs automatically inside Claude Code, Cursor, Codex, Aider, and 7 other AI tools via `vibecop init`.
+  </Card>
+  <Card title="MCP Server" icon="rocket">
+    Available as an MCP server for Continue.dev, Amazon Q, Zed, and any MCP-compatible tool.
+  </Card>
+  <Card title="Fast & Deterministic" icon="approve-check">
+    Built on ast-grep for tree-sitter-based AST analysis. No API keys, no network calls, fully reproducible.
+  </Card>
+</CardGrid>
+
+## Quick Example
+
+```bash
+# Install
+npm install -g vibecop
+
+# Scan your project
+vibecop scan .
+
+# Auto-setup for your AI coding tool
+vibecop init
+```
+
+## What It Catches
+
+```
+src/services/user.service.ts
+  45:1    error    Function 'processUserData' is too complex (232 lines)  god-function
+  89:5    warning  Database or API call inside a loop — potential N+1     n-plus-one-query
+  145:5   warning  Database mutation result is not checked                unchecked-db-result
+
+src/config/auth.ts
+  12:5    error    Placeholder domain found: "yourdomain.com"            placeholder-in-production
+  18:5    error    Auth token stored in localStorage — vulnerable to XSS  token-in-localstorage
+
+src/utils/api.ts
+  34:12   warning  Double type assertion bypasses TypeScript type safety  double-type-assertion
+```
+
+## Benchmarks
+
+Median finding density: **established projects 4.4/kLOC vs vibe-coded 14.0/kLOC (3.2x higher)**. Vibe-coded projects consistently trigger more findings per line of code. See the [full benchmark data](/vibecop/benchmarks/).

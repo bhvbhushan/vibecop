@@ -2,7 +2,13 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { extname, join, relative, resolve } from "node:path";
 import { parse, Lang as SgLang, registerDynamicLanguage } from "@ast-grep/napi";
+import { loadConfig, DEFAULT_CONFIG } from "./config.js";
+import { loadCustomRules } from "./custom-rules.js";
+import { builtinDetectors } from "./detectors/index.js";
+import { loadProjectInfo } from "./project.js";
 import type {
+  CheckFileOptions,
+  EngineScanOptions,
   VibeCopConfig,
   DetectionContext,
   Detector,
@@ -581,4 +587,97 @@ export function isTestFile(filePath: string): boolean {
 
 function isNodeError(err: unknown): err is NodeJS.ErrnoException {
   return err instanceof Error && "code" in err;
+}
+
+/**
+ * Load config, resolve detectors (builtins + custom rules).
+ * Shared setup for scan() and checkFile().
+ */
+function loadDetectors(
+  scanRoot: string,
+  config: VibeCopConfig,
+): Detector[] {
+  const customDetectors = loadCustomRules(
+    resolve(scanRoot, config["custom-rules-dir"] ?? ".vibecop/rules"),
+  );
+  return [...builtinDetectors, ...customDetectors];
+}
+
+/** Resolve config from EngineScanOptions */
+function resolveConfig(options: EngineScanOptions): VibeCopConfig {
+  if (options.config === false) {
+    return { ...DEFAULT_CONFIG };
+  }
+  return loadConfig(options.config || undefined);
+}
+
+/**
+ * Run a full scan and return structured results.
+ * This is the main orchestration point for both CLI and MCP server.
+ *
+ * Does NOT format output or call process.exit().
+ */
+export async function scan(options: EngineScanOptions = {}): Promise<ScanResult> {
+  const scanRoot = resolve(options.scanPath ?? ".");
+  const config = resolveConfig(options);
+  const project = loadProjectInfo(scanRoot);
+
+  // Discover files
+  let files: FileInfo[];
+  if (options.files) {
+    files = pathsToFileInfos(options.files, scanRoot);
+  } else {
+    files = discoverFiles(scanRoot, config);
+  }
+
+  const allDetectors = loadDetectors(scanRoot, config);
+  const maxFindings = options.maxFindings ?? 50;
+
+  return runDetectors(files, allDetectors, project, config, {
+    verbose: options.verbose,
+    maxFindings,
+  });
+}
+
+/**
+ * Check a single file and return structured results.
+ * This is the single-file scanning point for both CLI and MCP server.
+ *
+ * Does NOT format output or call process.exit().
+ * Throws if the file does not exist or has an unsupported extension.
+ */
+export function checkFile(
+  filePath: string,
+  options: CheckFileOptions = {},
+): ScanResult {
+  const absolutePath = resolve(filePath);
+  if (!existsSync(absolutePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+
+  const ext = extname(absolutePath);
+  const language = EXTENSION_MAP[ext];
+  if (!language) {
+    throw new Error(
+      `Unsupported file type: ${ext}. Supported: ${Object.keys(EXTENSION_MAP).join(", ")}`,
+    );
+  }
+
+  const scanRoot = resolve(".");
+  const fileInfo: FileInfo = {
+    path: relative(scanRoot, absolutePath),
+    absolutePath,
+    language,
+    extension: ext,
+  };
+
+  const config = { ...DEFAULT_CONFIG };
+  const project = loadProjectInfo(scanRoot);
+  const allDetectors = loadDetectors(scanRoot, config);
+  const maxFindings = options.maxFindings ?? 50;
+
+  return runDetectors([fileInfo], allDetectors, project, config, {
+    verbose: options.verbose,
+    maxFindings,
+  });
 }
